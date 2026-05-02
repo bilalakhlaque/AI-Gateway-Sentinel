@@ -9,6 +9,7 @@ import { z as zod } from "zod";
 
 export const CompareBody = zod.object({
   prompt: zod.string(),
+  tenantId: zod.string().optional(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),

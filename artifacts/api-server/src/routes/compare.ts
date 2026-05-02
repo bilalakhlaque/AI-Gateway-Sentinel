@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { callModel, type ModelName, type ModelKeys } from "../lib/llmGateway";
+import { recordRequest } from "../lib/statsStore";
 import { detectPii } from "../lib/piiDetector";
 import { detectPromptInjection } from "../lib/promptInjectionDetector";
 import { z } from "zod";
@@ -16,6 +17,7 @@ const ModelKeysSchema = z
 
 const CompareBody = z.object({
   prompt: z.string().min(1),
+  tenantId: z.string().optional(),
   modelKeys: ModelKeysSchema,
 });
 
@@ -28,7 +30,7 @@ router.post("/compare", async (req, res): Promise<void> => {
     return;
   }
 
-  const { prompt, modelKeys } = parsed.data;
+  const { prompt, modelKeys, tenantId = "default" } = parsed.data;
 
   const piiMatches = detectPii(prompt);
   if (piiMatches.length > 0) {
@@ -60,6 +62,16 @@ router.post("/compare", async (req, res): Promise<void> => {
         status: "success",
         error: null,
       };
+      recordRequest(tenantId, {
+        model,
+        modelUsed: r.modelUsed,
+        tokens: r.tokens,
+        cost: r.cost,
+        latencyMs: r.latencyMs,
+        status: "success",
+        promptSnippet: prompt.slice(0, 80),
+        responseText: r.response,
+      });
     } else {
       const msg =
         outcome.reason instanceof Error
@@ -73,6 +85,16 @@ router.post("/compare", async (req, res): Promise<void> => {
         status: "error",
         error: msg,
       };
+      recordRequest(tenantId, {
+        model,
+        modelUsed: model,
+        tokens: 0,
+        cost: 0,
+        latencyMs: 0,
+        status: "error",
+        promptSnippet: prompt.slice(0, 80),
+        errorMessage: msg,
+      });
     }
   }
 

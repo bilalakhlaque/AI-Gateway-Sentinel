@@ -23,6 +23,7 @@ export const ChatBody = zod.object({
   prompt: zod.string(),
   model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
+  tenantId: zod.string().optional(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),
@@ -50,6 +51,7 @@ export const ChatResponse = zod.object({
  */
 export const CompareBody = zod.object({
   prompt: zod.string(),
+  tenantId: zod.string().optional(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),
@@ -97,9 +99,18 @@ export const CompareResponse = zod.object({
 });
 
 /**
- * Returns total requests, per-model stats, costs, and blocked request count
+ * Returns total requests, per-model stats, costs, and blocked request count. Filtered by tenantId if provided.
  * @summary Get gateway statistics
  */
+export const GetStatsQueryParams = zod.object({
+  tenantId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Tenant ID to filter stats for. Returns aggregate across all tenants if omitted.",
+    ),
+});
+
 export const GetStatsResponse = zod.object({
   totalRequests: zod.number(),
   blockedRequests: zod.number(),
@@ -136,9 +147,16 @@ export const GetStatsResponse = zod.object({
 });
 
 /**
- * Returns the last 20 request log entries
+ * Returns the last 20 request log entries, filtered by tenantId if provided.
  * @summary Get recent traffic logs
  */
+export const GetLogsQueryParams = zod.object({
+  tenantId: zod.coerce
+    .string()
+    .optional()
+    .describe("Tenant ID to filter logs for. Returns all logs if omitted."),
+});
+
 export const GetLogsResponse = zod.object({
   logs: zod.array(
     zod.object({
@@ -153,6 +171,23 @@ export const GetLogsResponse = zod.object({
       promptSnippet: zod.string(),
       responseText: zod.string().nullish(),
       errorMessage: zod.string().nullish(),
+      tenantId: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * Returns every known tenant ID with their aggregate request count, cost, and token usage
+ * @summary List all tenants with summary stats
+ */
+export const GetTenantsResponse = zod.object({
+  tenants: zod.array(
+    zod.object({
+      tenantId: zod.string(),
+      totalRequests: zod.number(),
+      blockedRequests: zod.number(),
+      totalCost: zod.number(),
+      totalTokens: zod.number(),
     }),
   ),
 });

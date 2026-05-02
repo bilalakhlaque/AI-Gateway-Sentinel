@@ -3,9 +3,11 @@ import {
   useChat,
   useCompare,
   useGetStats, 
-  useGetLogs, 
+  useGetLogs,
+  useGetTenants,
   getGetStatsQueryKey, 
-  getGetLogsQueryKey 
+  getGetLogsQueryKey,
+  getGetTenantsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,10 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
+import { useTenantId, PRESET_TENANTS } from "@/hooks/useTenantId";
 
 const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
   { type: "email", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
@@ -94,6 +97,8 @@ type Mode = "single" | "compare";
 export default function Home() {
   const queryClient = useQueryClient();
   const { keys, updateKey, getModelKeys, hasAnyKey } = useApiKeys();
+  const { tenantId, setTenantId } = useTenantId();
+  const [showTenantPicker, setShowTenantPicker] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelKey>("openai");
   const [mode, setMode] = useState<Mode>("single");
@@ -111,8 +116,9 @@ export default function Home() {
   const [lastComparePrompt, setLastComparePrompt] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
-  const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
+  const { data: stats } = useGetStats({ tenantId }, { query: { refetchInterval: 5000, queryKey: [...getGetStatsQueryKey({ tenantId }), tenantId] } });
+  const { data: logsData } = useGetLogs({ tenantId }, { query: { refetchInterval: 5000, queryKey: [...getGetLogsQueryKey({ tenantId }), tenantId] } });
+  const { data: tenantsData } = useGetTenants({ query: { refetchInterval: 5000, queryKey: getGetTenantsQueryKey() } });
 
   const chatMutation = useChat();
   const compareMutation = useCompare();
@@ -128,11 +134,12 @@ export default function Home() {
     setPendingFallback(null);
     setLastError(null);
 
-    chatMutation.mutate({ data: { prompt, model: targetModel, modelKeys: getModelKeys() as any } }, {
+    chatMutation.mutate({ data: { prompt, model: targetModel, tenantId, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setLastResponse(data);
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetTenantsQueryKey() });
       },
       onError: (err: any) => {
         queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
@@ -158,13 +165,14 @@ export default function Home() {
     setPiiWarning(null);
     setCompareResults(null);
     setLastComparePrompt(prompt);
-    compareMutation.mutate({ data: { prompt, modelKeys: getModelKeys() as any } }, {
+    compareMutation.mutate({ data: { prompt, tenantId, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setCompareResults(
           Object.entries(data.results as Record<string, any>).map(([model, r]) => ({ model, ...(r as any) }))
         );
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetTenantsQueryKey() });
       },
       onError: (err: any) => {
         const msg = (err?.data as any)?.error ?? "Compare failed";
@@ -404,6 +412,50 @@ export default function Home() {
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
             SYSTEM OPERATIONAL
           </div>
+
+          {/* Tenant Switcher */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTenantPicker((v) => !v)}
+              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 hover:border-cyan-600/50 transition-colors text-[11px] font-mono text-slate-300"
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="max-w-[80px] truncate">{tenantId}</span>
+              <ChevronRight className={`w-3 h-3 text-slate-500 transition-transform ${showTenantPicker ? "rotate-90" : ""}`} />
+            </button>
+            {showTenantPicker && (
+              <div className="absolute right-0 top-10 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/60 py-2 min-w-[160px]">
+                <div className="px-3 pb-1.5 pt-0.5">
+                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Switch Tenant</span>
+                </div>
+                {PRESET_TENANTS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => { setTenantId(t); setShowTenantPicker(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-slate-800 transition-colors flex items-center justify-between gap-2 ${tenantId === t ? "text-cyan-400" : "text-slate-300"}`}
+                  >
+                    {t}
+                    {tenantId === t && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                  </button>
+                ))}
+                <div className="border-t border-slate-800 mt-1.5 pt-1.5 px-3">
+                  <input
+                    autoFocus={false}
+                    placeholder="custom id…"
+                    defaultValue={PRESET_TENANTS.includes(tenantId) ? "" : tenantId}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val) { setTenantId(val); setShowTenantPicker(false); }
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-cyan-600/60"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -918,6 +970,56 @@ export default function Home() {
                   <Bar dataKey="cost" radius={[0, 4, 4, 0]} barSize={24} />
                 </BarChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Tenants Panel */}
+          <Card className="bg-slate-900/50 border-slate-800 shadow-xl">
+            <CardHeader className="p-4 border-b border-slate-800/50">
+              <CardTitle className="text-sm font-mono text-slate-300 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-cyan-400" />
+                  Tenants
+                </div>
+                <span className="text-[10px] font-mono text-slate-500 font-normal">
+                  {(tenantsData?.tenants ?? []).length} active · viewing <span className="text-cyan-400">{tenantId}</span>
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!tenantsData?.tenants?.length ? (
+                <div className="flex items-center justify-center text-slate-500 font-mono text-xs py-6">
+                  No requests yet
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800/50">
+                  {tenantsData.tenants.map((t) => {
+                    const isActive = t.tenantId === tenantId;
+                    const successRate = t.totalRequests > 0
+                      ? Math.round(((t.totalRequests - t.blockedRequests) / t.totalRequests) * 100)
+                      : 0;
+                    return (
+                      <button
+                        key={t.tenantId}
+                        onClick={() => setTenantId(t.tenantId)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/60 ${isActive ? "bg-slate-800/40" : ""}`}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? "bg-cyan-400" : "bg-slate-600"}`} />
+                        <span className={`text-[11px] font-mono font-semibold w-20 truncate ${isActive ? "text-cyan-300" : "text-slate-300"}`}>
+                          {t.tenantId}
+                        </span>
+                        <div className="flex items-center gap-4 ml-auto text-[10px] font-mono text-slate-400 flex-wrap">
+                          <span><span className="text-slate-200">{t.totalRequests}</span> req</span>
+                          <span><span className={t.blockedRequests > 0 ? "text-rose-400" : "text-slate-200"}>{t.blockedRequests}</span> blocked</span>
+                          <span><span className="text-emerald-400">{successRate}%</span> ok</span>
+                          <span><span className="text-emerald-400">${t.totalCost.toFixed(5)}</span></span>
+                          <span><span className="text-slate-200">{t.totalTokens.toLocaleString()}</span> tok</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 

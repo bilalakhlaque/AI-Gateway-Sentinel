@@ -3,16 +3,17 @@ const MAX_REQUESTS = 10;
 
 const store = new Map<string, number[]>();
 
-export function isRateLimited(apiKey: string): boolean {
+export function isRateLimited(tenantId: string, apiKey: string): boolean {
+  const key = `${tenantId}:${apiKey}`;
   const now = Date.now();
-  const timestamps = (store.get(apiKey) ?? []).filter(
+  const timestamps = (store.get(key) ?? []).filter(
     (t) => now - t < WINDOW_MS,
   );
   if (timestamps.length >= MAX_REQUESTS) {
-    store.set(apiKey, timestamps);
+    store.set(key, timestamps);
     return true;
   }
   timestamps.push(now);
-  store.set(apiKey, timestamps);
+  store.set(key, timestamps);
   return false;
 }

@@ -11,6 +11,7 @@ export const ChatBody = zod.object({
   prompt: zod.string(),
   model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
+  tenantId: zod.string().optional(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),

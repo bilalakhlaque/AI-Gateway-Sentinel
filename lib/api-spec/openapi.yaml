@@ -92,7 +92,14 @@ paths:
       operationId: getStats
       tags: [stats]
       summary: Get gateway statistics
-      description: Returns total requests, per-model stats, costs, and blocked request count
+      description: Returns total requests, per-model stats, costs, and blocked request count. Filtered by tenantId if provided.
+      parameters:
+        - name: tenantId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Tenant ID to filter stats for. Returns aggregate across all tenants if omitted.
       responses:
         "200":
           description: Stats data
@@ -106,7 +113,14 @@ paths:
       operationId: getLogs
       tags: [stats]
       summary: Get recent traffic logs
-      description: Returns the last 20 request log entries
+      description: Returns the last 20 request log entries, filtered by tenantId if provided.
+      parameters:
+        - name: tenantId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Tenant ID to filter logs for. Returns all logs if omitted.
       responses:
         "200":
           description: Traffic log entries
@@ -114,6 +128,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LogsResponse"
+
+  /tenants:
+    get:
+      operationId: getTenants
+      tags: [stats]
+      summary: List all tenants with summary stats
+      description: Returns every known tenant ID with their aggregate request count, cost, and token usage
+      responses:
+        "200":
+          description: Tenant list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantsResponse"
 
 components:
   schemas:
@@ -164,6 +192,8 @@ components:
       type: object
       properties:
         prompt:
+          type: string
+        tenantId:
           type: string
         modelKeys:
           $ref: "#/components/schemas/ModelKeys"
@@ -224,6 +254,8 @@ components:
           enum: [openai, gemini, claude, claude-opus]
         apiKey:
           type: ["string", "null"]
+        tenantId:
+          type: string
         modelKeys:
           $ref: "#/components/schemas/ModelKeys"
       required:
@@ -336,6 +368,8 @@ components:
           type: ["string", "null"]
         errorMessage:
           type: ["string", "null"]
+        tenantId:
+          type: string
       required:
         - id
         - timestamp
@@ -346,6 +380,7 @@ components:
         - latencyMs
         - status
         - promptSnippet
+        - tenantId
 
     LogsResponse:
       type: object
@@ -356,6 +391,36 @@ components:
             $ref: "#/components/schemas/LogEntry"
       required:
         - logs
+
+    TenantSummary:
+      type: object
+      properties:
+        tenantId:
+          type: string
+        totalRequests:
+          type: integer
+        blockedRequests:
+          type: integer
+        totalCost:
+          type: number
+        totalTokens:
+          type: integer
+      required:
+        - tenantId
+        - totalRequests
+        - blockedRequests
+        - totalCost
+        - totalTokens
+
+    TenantsResponse:
+      type: object
+      properties:
+        tenants:
+          type: array
+          items:
+            $ref: "#/components/schemas/TenantSummary"
+      required:
+        - tenants
 
     ChatFailedResponse:
       type: object

@@ -35,6 +35,7 @@ export interface PiiBlockedResponse {
 
 export interface CompareRequest {
   prompt: string;
+  tenantId?: string;
   modelKeys?: ModelKeys;
 }
 
@@ -83,6 +84,7 @@ export interface ChatRequest {
   model: ChatRequestModel;
   /** @nullable */
   apiKey?: string | null;
+  tenantId?: string;
   modelKeys?: ModelKeys;
 }
 
@@ -154,10 +156,23 @@ export interface LogEntry {
   responseText?: string | null;
   /** @nullable */
   errorMessage?: string | null;
+  tenantId: string;
 }
 
 export interface LogsResponse {
   logs: LogEntry[];
+}
+
+export interface TenantSummary {
+  tenantId: string;
+  totalRequests: number;
+  blockedRequests: number;
+  totalCost: number;
+  totalTokens: number;
+}
+
+export interface TenantsResponse {
+  tenants: TenantSummary[];
 }
 
 export interface ChatFailedResponse {
@@ -169,3 +184,17 @@ export interface ChatFailedResponse {
 export interface ErrorResponse {
   error: string;
 }
+
+export type GetStatsParams = {
+  /**
+   * Tenant ID to filter stats for. Returns aggregate across all tenants if omitted.
+   */
+  tenantId?: string;
+};
+
+export type GetLogsParams = {
+  /**
+   * Tenant ID to filter logs for. Returns all logs if omitted.
+   */
+  tenantId?: string;
+};

@@ -17,6 +17,7 @@ router.post("/chat", async (req, res): Promise<void> => {
 
   const { prompt, model } = parsed.data;
   const modelKeys = (parsed.data as any).modelKeys as ModelKeys | undefined;
+  const tenantId: string = (parsed.data as any).tenantId ?? "default";
   const rateLimitKey = parsed.data.apiKey ?? model;
 
   const piiMatches = detectPii(prompt);
@@ -32,7 +33,7 @@ router.post("/chat", async (req, res): Promise<void> => {
 
   const injectionMatches = detectPromptInjection(prompt);
   if (injectionMatches.length > 0) {
-    recordRequest({
+    recordRequest(tenantId, {
       model: model as ModelName,
       modelUsed: model as ModelName,
       tokens: 0,
@@ -51,8 +52,8 @@ router.post("/chat", async (req, res): Promise<void> => {
     return;
   }
 
-  if (isRateLimited(rateLimitKey)) {
-    recordRequest({
+  if (isRateLimited(tenantId, rateLimitKey)) {
+    recordRequest(tenantId, {
       model: model as ModelName,
       modelUsed: model as ModelName,
       tokens: 0,
@@ -72,7 +73,7 @@ router.post("/chat", async (req, res): Promise<void> => {
   try {
     const result = await callModel(model as ModelName, prompt, modelKeys);
 
-    recordRequest({
+    recordRequest(tenantId, {
       model: model as ModelName,
       modelUsed: result.modelUsed,
       tokens: result.tokens,
@@ -98,7 +99,7 @@ router.post("/chat", async (req, res): Promise<void> => {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     const suggestedFallback = FALLBACK_NEXT[model as ModelName] ?? null;
 
-    recordRequest({
+    recordRequest(tenantId, {
       model: model as ModelName,
       modelUsed: model as ModelName,
       tokens: 0,

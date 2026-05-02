@@ -19,6 +19,7 @@ export const LogEntry = zod.object({
   promptSnippet: zod.string(),
   responseText: zod.string().nullish(),
   errorMessage: zod.string().nullish(),
+  tenantId: zod.string(),
 });
 
 export type LogEntry = zod.input<typeof LogEntry>;

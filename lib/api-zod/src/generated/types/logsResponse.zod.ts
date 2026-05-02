@@ -21,6 +21,7 @@ export const LogsResponse = zod.object({
       promptSnippet: zod.string(),
       responseText: zod.string().nullish(),
       errorMessage: zod.string().nullish(),
+      tenantId: zod.string(),
     }),
   ),
 });
