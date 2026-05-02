@@ -17,7 +17,7 @@ router.post("/chat", async (req, res): Promise<void> => {
 
   const { prompt, model } = parsed.data;
   const modelKeys = (parsed.data as any).modelKeys as ModelKeys | undefined;
-  const tenantId: string = (parsed.data as any).tenantId ?? "default";
+  const tenantId: string = res.locals["userId"] as string;
   const budgets: Record<string, number> | undefined = (parsed.data as any).budgets;
   const rateLimitKey = parsed.data.apiKey ?? model;
 

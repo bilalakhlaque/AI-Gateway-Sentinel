@@ -4,13 +4,13 @@ import { getStats, getLogs, getTenants } from "../lib/statsStore";
 const router: IRouter = Router();
 
 router.get("/stats", (req, res): void => {
-  const tenantId = req.query.tenantId as string | undefined;
-  res.json(getStats(tenantId));
+  const userId = res.locals["userId"] as string;
+  res.json(getStats(userId));
 });
 
 router.get("/logs", (req, res): void => {
-  const tenantId = req.query.tenantId as string | undefined;
-  res.json({ logs: getLogs(tenantId) });
+  const userId = res.locals["userId"] as string;
+  res.json({ logs: getLogs(userId) });
 });
 
 router.get("/tenants", (_req, res): void => {

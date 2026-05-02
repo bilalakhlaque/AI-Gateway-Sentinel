@@ -26,7 +26,6 @@ const BudgetMapSchema = z
 
 const CompareBody = z.object({
   prompt: z.string().min(1),
-  tenantId: z.string().optional(),
   budgets: BudgetMapSchema,
   modelKeys: ModelKeysSchema,
 });
@@ -40,7 +39,8 @@ router.post("/compare", async (req, res): Promise<void> => {
     return;
   }
 
-  const { prompt, modelKeys, tenantId = "default", budgets } = parsed.data;
+  const { prompt, modelKeys, budgets } = parsed.data;
+  const tenantId = res.locals["userId"] as string;
 
   const piiMatches = detectPii(prompt);
   if (piiMatches.length > 0) {

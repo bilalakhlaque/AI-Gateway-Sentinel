@@ -20,13 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { useBudgets, type ModelKey as BudgetModelKey } from "@/hooks/useBudgets";
 import { useTheme } from "@/hooks/useTheme";
-import { useTenantId, PRESET_TENANTS } from "@/hooks/useTenantId";
+import type { AuthUser } from "@/hooks/useAuth";
 
 const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
   { type: "email", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
@@ -125,13 +125,17 @@ const MODEL_LABELS: Record<ModelKey, string> = {
 
 type Mode = "single" | "compare";
 
-export default function Home() {
+interface HomeProps {
+  user: AuthUser;
+  onLogout: () => void;
+}
+
+export default function Home({ user, onLogout }: HomeProps) {
+  const tenantId = user.userId;
   const queryClient = useQueryClient();
   const { keys, updateKey, getModelKeys, hasAnyKey } = useApiKeys();
   const { budgets, setBudget, getActiveBudgets } = useBudgets();
   const { theme, toggleTheme } = useTheme();
-  const { tenantId, setTenantId } = useTenantId();
-  const [showTenantPicker, setShowTenantPicker] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelKey>("openai");
   const [mode, setMode] = useState<Mode>("single");
@@ -447,48 +451,20 @@ export default function Home() {
             SYSTEM OPERATIONAL
           </div>
 
-          {/* Tenant Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setShowTenantPicker((v) => !v)}
-              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-700 bg-slate-800/60 hover:bg-slate-800 hover:border-cyan-600/50 transition-colors text-[11px] font-mono text-slate-300"
-            >
-              <Users className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="max-w-[80px] truncate">{tenantId}</span>
-              <ChevronRight className={`w-3 h-3 text-slate-500 transition-transform ${showTenantPicker ? "rotate-90" : ""}`} />
-            </button>
-            {showTenantPicker && (
-              <div className="absolute right-0 top-10 z-50 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/60 py-2 min-w-[160px]">
-                <div className="px-3 pb-1.5 pt-0.5">
-                  <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Switch Tenant</span>
-                </div>
-                {PRESET_TENANTS.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => { setTenantId(t); setShowTenantPicker(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-[11px] font-mono hover:bg-slate-800 transition-colors flex items-center justify-between gap-2 ${tenantId === t ? "text-cyan-400" : "text-slate-300"}`}
-                  >
-                    {t}
-                    {tenantId === t && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
-                  </button>
-                ))}
-                <div className="border-t border-slate-800 mt-1.5 pt-1.5 px-3">
-                  <input
-                    autoFocus={false}
-                    placeholder="custom id…"
-                    defaultValue={PRESET_TENANTS.includes(tenantId) ? "" : tenantId}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const val = (e.target as HTMLInputElement).value.trim();
-                        if (val) { setTenantId(val); setShowTenantPicker(false); }
-                      }
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-[11px] font-mono text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-cyan-600/60"
-                  />
-                </div>
-              </div>
-            )}
+          {/* Logged-in user badge */}
+          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-slate-700 bg-slate-800/60 text-[11px] font-mono text-slate-300">
+            <Users className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="max-w-[100px] truncate text-cyan-300">{user.username}</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLogout}
+            title="Sign out"
+            className="h-8 w-8 p-0 hover:bg-slate-800 hover:text-rose-400 text-slate-500 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
 
           <Button
             variant="ghost"
@@ -1179,10 +1155,9 @@ export default function Home() {
                       ? Math.round(((t.totalRequests - t.blockedRequests) / t.totalRequests) * 100)
                       : 0;
                     return (
-                      <button
+                      <div
                         key={t.tenantId}
-                        onClick={() => setTenantId(t.tenantId)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/60 ${isActive ? "bg-slate-800/40" : ""}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left ${isActive ? "bg-slate-800/40" : ""}`}
                       >
                         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActive ? "bg-cyan-400" : "bg-slate-600"}`} />
                         <span className={`text-[11px] font-mono font-semibold w-20 truncate ${isActive ? "text-cyan-300" : "text-slate-300"}`}>
@@ -1195,7 +1170,7 @@ export default function Home() {
                           <span><span className="text-emerald-400">${t.totalCost.toFixed(5)}</span></span>
                           <span><span className="text-slate-200">{t.totalTokens.toLocaleString()}</span> tok</span>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
