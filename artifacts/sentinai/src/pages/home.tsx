@@ -49,6 +49,7 @@ export default function Home() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isLogFullscreen, setIsLogFullscreen] = useState(false);
+  const [isResponseFullscreen, setIsResponseFullscreen] = useState(false);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
@@ -417,6 +418,18 @@ export default function Home() {
                 </div>
               )}
             </CardContent>
+            <div className="p-3 border-t border-slate-800/50 bg-slate-900/80 flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-3 text-xs font-mono text-slate-400 hover:text-cyan-400 hover:bg-slate-800 gap-2"
+                onClick={() => setIsResponseFullscreen(true)}
+                disabled={!lastResponse}
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                Expand Response
+              </Button>
+            </div>
           </Card>
         </div>
 
@@ -552,6 +565,42 @@ export default function Home() {
           </Card>
         </div>
       </main>
+
+      {/* Fullscreen Response Overlay */}
+      {isResponseFullscreen && lastResponse && (
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-cyan-500/10 p-2 rounded-lg border border-cyan-500/20">
+                <Database className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-mono text-slate-200 font-semibold tracking-wide">Response Log</h2>
+                <p className="text-[10px] font-mono text-slate-500">
+                  {lastResponse.model} → {lastResponse.modelUsed} · {lastResponse.latencyMs}ms · ${lastResponse.cost.toFixed(6)}
+                </p>
+              </div>
+              <Badge className={`ml-2 ${lastResponse.status === 'success' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30'}`}>
+                {lastResponse.status.toUpperCase()}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 gap-2"
+              onClick={() => setIsResponseFullscreen(false)}
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              Collapse
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto p-8">
+            <p className="text-base font-mono text-slate-200 whitespace-pre-wrap leading-loose">
+              {lastResponse.response || "No response content."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen Log Overlay */}
       {isLogFullscreen && (
