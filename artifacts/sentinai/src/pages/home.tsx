@@ -487,12 +487,26 @@ export default function Home() {
                           {isExpanded && (
                             <TableRow className="border-slate-800/50 bg-slate-950/60 hover:bg-slate-950/60">
                               <TableCell colSpan={8} className="px-6 py-3">
-                                <div className="flex flex-col gap-2">
-                                  <div>
-                                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Full Prompt</span>
-                                    <p className="mt-1 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-800 rounded bg-slate-900/60 p-3">
-                                      {log.promptSnippet}
-                                    </p>
+                                <div className="flex flex-col gap-3">
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Prompt</span>
+                                      <p className="mt-1 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-800 rounded bg-slate-900/60 p-3 max-h-48 overflow-y-auto">
+                                        {log.promptSnippet}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] font-mono text-cyan-500 uppercase tracking-wider">Response</span>
+                                      {log.responseText ? (
+                                        <p className="mt-1 text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed border border-cyan-900/40 rounded bg-cyan-950/10 p-3 max-h-48 overflow-y-auto">
+                                          {log.responseText}
+                                        </p>
+                                      ) : (
+                                        <p className="mt-1 text-xs font-mono text-slate-600 italic border border-slate-800 rounded bg-slate-900/60 p-3">
+                                          No response recorded
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                   {log.errorMessage && (
                                     <div>
@@ -502,7 +516,7 @@ export default function Home() {
                                       </p>
                                     </div>
                                   )}
-                                  <div className="flex items-center gap-6 pt-1">
+                                  <div className="flex items-center gap-6">
                                     <span className="text-[10px] font-mono text-slate-500">
                                       ID: <span className="text-slate-400">{log.id}</span>
                                     </span>

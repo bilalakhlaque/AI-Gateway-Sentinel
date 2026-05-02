@@ -91,6 +91,8 @@ export interface LogEntry {
   status: LogEntryStatus;
   promptSnippet: string;
   /** @nullable */
+  responseText?: string | null;
+  /** @nullable */
   errorMessage?: string | null;
 }
 

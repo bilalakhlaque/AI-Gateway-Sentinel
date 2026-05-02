@@ -215,6 +215,8 @@ components:
           enum: [success, fallback, blocked, error]
         promptSnippet:
           type: string
+        responseText:
+          type: ["string", "null"]
         errorMessage:
           type: ["string", "null"]
       required:

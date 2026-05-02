@@ -19,6 +19,7 @@ interface LogEntry {
   latencyMs: number;
   status: RequestStatus;
   promptSnippet: string;
+  responseText?: string | null;
   errorMessage?: string | null;
 }
 
@@ -41,6 +42,7 @@ export function recordRequest(entry: {
   latencyMs: number;
   status: RequestStatus;
   promptSnippet: string;
+  responseText?: string | null;
   errorMessage?: string | null;
 }): void {
   totalRequests++;

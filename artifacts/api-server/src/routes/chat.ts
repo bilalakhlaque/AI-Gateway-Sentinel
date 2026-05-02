@@ -45,6 +45,7 @@ router.post("/chat", async (req, res): Promise<void> => {
       latencyMs: result.latencyMs,
       status: "success",
       promptSnippet: prompt.slice(0, 80),
+      responseText: result.response,
     });
 
     res.json({

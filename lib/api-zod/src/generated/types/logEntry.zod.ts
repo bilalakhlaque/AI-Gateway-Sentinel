@@ -17,6 +17,7 @@ export const LogEntry = zod.object({
   latencyMs: zod.number(),
   status: zod.enum(["success", "fallback", "blocked", "error"]),
   promptSnippet: zod.string(),
+  responseText: zod.string().nullish(),
   errorMessage: zod.string().nullish(),
 });
 
