@@ -33,6 +33,35 @@ export interface PiiBlockedResponse {
   piiMatches: PiiMatch[];
 }
 
+export type ModelHealthEntryStatus =
+  (typeof ModelHealthEntryStatus)[keyof typeof ModelHealthEntryStatus];
+
+export const ModelHealthEntryStatus = {
+  healthy: "healthy",
+  degraded: "degraded",
+  down: "down",
+  unknown: "unknown",
+} as const;
+
+export interface ModelHealthEntry {
+  status: ModelHealthEntryStatus;
+  lastChecked: string;
+  successRate: number;
+  recentErrors: number;
+}
+
+export type ModelHealthResponseModels = {
+  openai?: ModelHealthEntry;
+  gemini?: ModelHealthEntry;
+  claude?: ModelHealthEntry;
+  "claude-opus"?: ModelHealthEntry;
+};
+
+export interface ModelHealthResponse {
+  timestamp: string;
+  models: ModelHealthResponseModels;
+}
+
 export interface BudgetMap {
   openai?: number;
   gemini?: number;

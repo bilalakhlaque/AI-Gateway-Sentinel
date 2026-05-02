@@ -87,6 +87,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/PiiBlockedResponse"
 
+  /health/models:
+    get:
+      operationId: getModelHealth
+      tags: [health]
+      summary: Get per-model API health status
+      description: Returns live health status for each model API based on recent traffic analysis
+      responses:
+        "200":
+          description: Model health statuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelHealthResponse"
+
   /stats:
     get:
       operationId: getStats
@@ -187,6 +201,44 @@ components:
       required:
         - error
         - piiMatches
+
+    ModelHealthEntry:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, down, unknown]
+        lastChecked:
+          type: string
+        successRate:
+          type: number
+        recentErrors:
+          type: integer
+      required:
+        - status
+        - lastChecked
+        - successRate
+        - recentErrors
+
+    ModelHealthResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        models:
+          type: object
+          properties:
+            openai:
+              $ref: "#/components/schemas/ModelHealthEntry"
+            gemini:
+              $ref: "#/components/schemas/ModelHealthEntry"
+            claude:
+              $ref: "#/components/schemas/ModelHealthEntry"
+            claude-opus:
+              $ref: "#/components/schemas/ModelHealthEntry"
+      required:
+        - timestamp
+        - models
 
     BudgetMap:
       type: object

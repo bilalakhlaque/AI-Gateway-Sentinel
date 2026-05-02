@@ -21,6 +21,8 @@ export * from "./getStatsParams.zod";
 export * from "./healthStatus.zod";
 export * from "./logEntry.zod";
 export * from "./logsResponse.zod";
+export * from "./modelHealthEntry.zod";
+export * from "./modelHealthResponse.zod";
 export * from "./modelKeys.zod";
 export * from "./modelStats.zod";
 export * from "./piiBlockedResponse.zod";

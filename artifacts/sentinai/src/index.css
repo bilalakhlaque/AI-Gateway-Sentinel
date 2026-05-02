@@ -215,3 +215,17 @@
     pointer-events: none;
   }
 }
+
+/* Light mode: invert the dark UI cleanly */
+html.sentinai-light .sentinai-root {
+  filter: invert(1) hue-rotate(180deg);
+  background: #fff;
+}
+
+/* Re-invert elements that should keep their natural colour */
+html.sentinai-light .sentinai-root img,
+html.sentinai-light .sentinai-root video,
+html.sentinai-light .sentinai-root canvas,
+html.sentinai-light .sentinai-root svg image {
+  filter: invert(1) hue-rotate(180deg);
+}

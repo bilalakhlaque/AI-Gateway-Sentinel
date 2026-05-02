@@ -157,6 +157,47 @@ export function getLogs(tenantId?: string): LogEntry[] {
   return all.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 20);
 }
 
+export type HealthStatus = "healthy" | "degraded" | "down" | "unknown";
+
+export function getModelHealth(): Record<ModelName, { status: HealthStatus; lastChecked: string; successRate: number; recentErrors: number }> {
+  const allLogs: Array<{ model: ModelName; status: string }> = [];
+  for (const bucket of tenants.values()) {
+    for (const log of bucket.logs) {
+      allLogs.push({ model: log.modelUsed, status: log.status });
+    }
+  }
+
+  const models: ModelName[] = ["openai", "gemini", "claude", "claude-opus"];
+  const result = {} as Record<ModelName, { status: HealthStatus; lastChecked: string; successRate: number; recentErrors: number }>;
+
+  for (const model of models) {
+    const recent = allLogs.filter((l) => l.model === model).slice(0, 10);
+    const total = recent.length;
+    const errors = recent.filter((l) => l.status === "error").length;
+    const successes = recent.filter((l) => l.status === "success").length;
+
+    let status: HealthStatus;
+    if (total === 0) {
+      status = "unknown";
+    } else if (errors >= 3 && errors === total) {
+      status = "down";
+    } else if (errors > 0) {
+      status = successes > 0 ? "degraded" : "down";
+    } else {
+      status = "healthy";
+    }
+
+    result[model] = {
+      status,
+      lastChecked: new Date().toISOString(),
+      successRate: total > 0 ? (successes / total) * 100 : 100,
+      recentErrors: errors,
+    };
+  }
+
+  return result;
+}
+
 export function getModelCost(tenantId: string, model: ModelName): number {
   return getBucket(tenantId).modelStats[model].cost;
 }

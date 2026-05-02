@@ -26,6 +26,7 @@ import type {
   GetStatsParams,
   HealthStatus,
   LogsResponse,
+  ModelHealthResponse,
   PiiBlockedResponse,
   StatsResponse,
   TenantsResponse,
@@ -287,6 +288,82 @@ export const useCompare = <
 > => {
   return useMutation(getCompareMutationOptions(options));
 };
+
+/**
+ * Returns live health status for each model API based on recent traffic analysis
+ * @summary Get per-model API health status
+ */
+export const getGetModelHealthUrl = () => {
+  return `/api/health/models`;
+};
+
+export const getModelHealth = async (
+  options?: RequestInit,
+): Promise<ModelHealthResponse> => {
+  return customFetch<ModelHealthResponse>(getGetModelHealthUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetModelHealthQueryKey = () => {
+  return [`/api/health/models`] as const;
+};
+
+export const getGetModelHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof getModelHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getModelHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetModelHealthQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getModelHealth>>> = ({
+    signal,
+  }) => getModelHealth({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getModelHealth>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetModelHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getModelHealth>>
+>;
+export type GetModelHealthQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get per-model API health status
+ */
+
+export function useGetModelHealth<
+  TData = Awaited<ReturnType<typeof getModelHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getModelHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetModelHealthQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * Returns total requests, per-model stats, costs, and blocked request count. Filtered by tenantId if provided.

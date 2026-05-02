@@ -5,6 +5,8 @@ import {
   useGetStats, 
   useGetLogs,
   useGetTenants,
+  useGetModelHealth,
+  getGetModelHealthQueryKey,
   getGetStatsQueryKey, 
   getGetLogsQueryKey,
   getGetTenantsQueryKey,
@@ -18,11 +20,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { useBudgets, type ModelKey as BudgetModelKey } from "@/hooks/useBudgets";
+import { useTheme } from "@/hooks/useTheme";
 import { useTenantId, PRESET_TENANTS } from "@/hooks/useTenantId";
 
 const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
@@ -126,6 +129,7 @@ export default function Home() {
   const queryClient = useQueryClient();
   const { keys, updateKey, getModelKeys, hasAnyKey } = useApiKeys();
   const { budgets, setBudget, getActiveBudgets } = useBudgets();
+  const { theme, toggleTheme } = useTheme();
   const { tenantId, setTenantId } = useTenantId();
   const [showTenantPicker, setShowTenantPicker] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -148,6 +152,7 @@ export default function Home() {
   const { data: stats } = useGetStats({ tenantId }, { query: { refetchInterval: 5000, queryKey: [...getGetStatsQueryKey({ tenantId }), tenantId] } });
   const { data: logsData } = useGetLogs({ tenantId }, { query: { refetchInterval: 5000, queryKey: [...getGetLogsQueryKey({ tenantId }), tenantId] } });
   const { data: tenantsData } = useGetTenants({ query: { refetchInterval: 5000, queryKey: getGetTenantsQueryKey() } });
+  const { data: healthData } = useGetModelHealth({ query: { refetchInterval: 30000, queryKey: getGetModelHealthQueryKey() } });
 
   const chatMutation = useChat();
   const compareMutation = useCompare();
@@ -422,7 +427,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30 flex flex-col">
+    <div className={`sentinai-root min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30 flex flex-col`}>
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-md">
         <div className="flex items-center gap-3">
@@ -485,6 +490,15 @@ export default function Home() {
             )}
           </div>
 
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-slate-800 hover:text-amber-400 text-slate-500 transition-colors"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -911,6 +925,61 @@ export default function Home() {
               })}
             </div>
           )}
+
+          {/* API Health Panel */}
+          {(() => {
+            const models = (["openai", "gemini", "claude", "claude-opus"] as const);
+            const STATUS_CONFIG = {
+              healthy:  { dot: "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]", label: "Healthy",  text: "text-emerald-400", pulse: true },
+              degraded: { dot: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.7)]",   label: "Degraded", text: "text-amber-400",   pulse: true },
+              down:     { dot: "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]",     label: "Down",     text: "text-rose-400",   pulse: false },
+              unknown:  { dot: "bg-slate-500",                                          label: "Unknown",  text: "text-slate-500",  pulse: false },
+            };
+            const anyDown = models.some(m => (healthData?.models as any)?.[m]?.status === "down");
+            return (
+              <Card className={`bg-slate-900/50 shadow-lg transition-colors ${anyDown ? "border-rose-500/50" : "border-slate-800"}`}>
+                <CardHeader className="p-3 pb-0 border-b border-slate-800/50">
+                  <CardTitle className="text-xs font-mono text-slate-300 flex items-center justify-between pb-3">
+                    <span className="flex items-center gap-2">
+                      <Wifi className="w-3.5 h-3.5 text-cyan-400" />
+                      API Health Monitor
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-600 uppercase tracking-wider">POLLS EVERY 30s</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {models.map(m => {
+                      const entry = (healthData?.models as any)?.[m];
+                      const status: keyof typeof STATUS_CONFIG = entry?.status ?? "unknown";
+                      const cfg = STATUS_CONFIG[status];
+                      const sr = entry?.successRate ?? 100;
+                      return (
+                        <div key={m} className="flex flex-col gap-2 rounded-lg border border-slate-800/70 bg-slate-950/40 p-2.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-mono text-slate-400 truncate">{MODEL_LABELS[m]}</span>
+                            <div className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot} ${cfg.pulse ? "animate-pulse" : ""}`} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[11px] font-mono font-medium ${cfg.text}`}>{cfg.label}</span>
+                            {entry && (
+                              <span className="text-[9px] font-mono text-slate-600">{sr.toFixed(0)}% ok</span>
+                            )}
+                          </div>
+                          {entry?.recentErrors > 0 && (
+                            <div className="flex items-center gap-1">
+                              <WifiOff className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                              <span className="text-[9px] font-mono text-rose-500">{entry.recentErrors} recent err{entry.recentErrors !== 1 ? "s" : ""}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Top Stats Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

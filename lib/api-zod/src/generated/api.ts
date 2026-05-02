@@ -115,6 +115,48 @@ export const CompareResponse = zod.object({
 });
 
 /**
+ * Returns live health status for each model API based on recent traffic analysis
+ * @summary Get per-model API health status
+ */
+export const GetModelHealthResponse = zod.object({
+  timestamp: zod.string(),
+  models: zod.object({
+    openai: zod
+      .object({
+        status: zod.enum(["healthy", "degraded", "down", "unknown"]),
+        lastChecked: zod.string(),
+        successRate: zod.number(),
+        recentErrors: zod.number(),
+      })
+      .optional(),
+    gemini: zod
+      .object({
+        status: zod.enum(["healthy", "degraded", "down", "unknown"]),
+        lastChecked: zod.string(),
+        successRate: zod.number(),
+        recentErrors: zod.number(),
+      })
+      .optional(),
+    claude: zod
+      .object({
+        status: zod.enum(["healthy", "degraded", "down", "unknown"]),
+        lastChecked: zod.string(),
+        successRate: zod.number(),
+        recentErrors: zod.number(),
+      })
+      .optional(),
+    "claude-opus": zod
+      .object({
+        status: zod.enum(["healthy", "degraded", "down", "unknown"]),
+        lastChecked: zod.string(),
+        successRate: zod.number(),
+        recentErrors: zod.number(),
+      })
+      .optional(),
+  }),
+});
+
+/**
  * Returns total requests, per-model stats, costs, and blocked request count. Filtered by tenantId if provided.
  * @summary Get gateway statistics
  */
