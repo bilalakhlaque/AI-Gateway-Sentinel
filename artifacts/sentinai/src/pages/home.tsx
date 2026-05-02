@@ -392,7 +392,7 @@ export default function Home() {
       <main className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-[1600px] mx-auto w-full">
         {/* Left Column: Chat */}
         <div className="xl:col-span-4 flex flex-col gap-6">
-          <Card className="bg-slate-900/50 border-slate-800 shadow-xl shadow-black/40 flex-1 flex flex-col">
+          <Card className="bg-slate-900/50 border-slate-800 shadow-xl shadow-black/40 flex flex-col">
             <CardHeader className="border-b border-slate-800/50 pb-3">
               <CardTitle className="text-base font-medium flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -415,7 +415,7 @@ export default function Home() {
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 flex-1 flex flex-col gap-4">
+            <CardContent className="p-4 flex flex-col gap-4">
               {mode === "single" && (
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Target Model</label>
@@ -440,7 +440,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-2 flex-1">
+              <div className="flex flex-col gap-2">
                 <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Input Prompt</label>
                 <Textarea 
                   ref={textareaRef}
