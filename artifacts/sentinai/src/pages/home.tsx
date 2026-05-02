@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { 
   useChat, 
   useGetStats, 
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 
 const MODEL_OPTIONS = [
@@ -47,6 +47,7 @@ export default function Home() {
   const [lastResponse, setLastResponse] = useState<any>(null);
   const [pendingFallback, setPendingFallback] = useState<PendingFallback | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
@@ -447,40 +448,75 @@ export default function Home() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    logs.map((log: any) => (
-                      <TableRow key={log.id} className="border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                        <TableCell className="text-slate-400 whitespace-nowrap">{format(new Date(log.timestamp), "HH:mm:ss.SSS")}</TableCell>
-                        <TableCell className="text-slate-300">{log.model}</TableCell>
-                        <TableCell className={log.model !== log.modelUsed ? "text-amber-400" : "text-cyan-400"}>{log.modelUsed}</TableCell>
-                        <TableCell className="text-slate-400 max-w-[200px] truncate" title={log.promptSnippet}>
-                          {log.promptSnippet}
-                        </TableCell>
-                        <TableCell className="text-right text-slate-300">{log.tokens}</TableCell>
-                        <TableCell className="text-right text-slate-300">{log.latencyMs}ms</TableCell>
-                        <TableCell className="text-right text-emerald-400">${log.cost.toFixed(6)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge variant="outline" className={`
-                              text-[10px] py-0 px-2 h-5 border-none whitespace-nowrap
-                              ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
-                              ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
-                              ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
-                              ${log.status === 'error' ? 'bg-rose-500/10 text-rose-300' : ''}
-                            `}>
-                              {log.status.toUpperCase()}
-                            </Badge>
-                            {log.errorMessage && (
-                              <span
-                                className="text-[10px] font-mono text-rose-400/80 max-w-[220px] truncate block text-right"
-                                title={log.errorMessage}
-                              >
-                                {log.errorMessage}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    logs.map((log: any) => {
+                      const isExpanded = expandedLogId === log.id;
+                      return (
+                        <React.Fragment key={log.id}>
+                          <TableRow
+                            className="border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer select-none"
+                            onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                          >
+                            <TableCell className="text-slate-400 whitespace-nowrap">
+                              <div className="flex items-center gap-1">
+                                {isExpanded
+                                  ? <ChevronUp className="w-3 h-3 text-cyan-400 shrink-0" />
+                                  : <ChevronDown className="w-3 h-3 text-slate-600 shrink-0" />}
+                                {format(new Date(log.timestamp), "HH:mm:ss.SSS")}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-slate-300">{log.model}</TableCell>
+                            <TableCell className={log.model !== log.modelUsed ? "text-amber-400" : "text-cyan-400"}>{log.modelUsed}</TableCell>
+                            <TableCell className="text-slate-400 max-w-[200px] truncate">
+                              {log.promptSnippet}
+                            </TableCell>
+                            <TableCell className="text-right text-slate-300">{log.tokens}</TableCell>
+                            <TableCell className="text-right text-slate-300">{log.latencyMs}ms</TableCell>
+                            <TableCell className="text-right text-emerald-400">${log.cost.toFixed(6)}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className={`
+                                text-[10px] py-0 px-2 h-5 border-none whitespace-nowrap
+                                ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
+                                ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
+                                ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
+                                ${log.status === 'error' ? 'bg-rose-500/10 text-rose-300' : ''}
+                              `}>
+                                {log.status.toUpperCase()}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow className="border-slate-800/50 bg-slate-950/60 hover:bg-slate-950/60">
+                              <TableCell colSpan={8} className="px-6 py-3">
+                                <div className="flex flex-col gap-2">
+                                  <div>
+                                    <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Full Prompt</span>
+                                    <p className="mt-1 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-800 rounded bg-slate-900/60 p-3">
+                                      {log.promptSnippet}
+                                    </p>
+                                  </div>
+                                  {log.errorMessage && (
+                                    <div>
+                                      <span className="text-[10px] font-mono text-rose-500 uppercase tracking-wider">Error</span>
+                                      <p className="mt-1 text-xs font-mono text-rose-400 whitespace-pre-wrap leading-relaxed border border-rose-900/40 rounded bg-rose-950/20 p-3">
+                                        {log.errorMessage}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-6 pt-1">
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      ID: <span className="text-slate-400">{log.id}</span>
+                                    </span>
+                                    <span className="text-[10px] font-mono text-slate-500">
+                                      {format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss.SSS")}
+                                    </span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
