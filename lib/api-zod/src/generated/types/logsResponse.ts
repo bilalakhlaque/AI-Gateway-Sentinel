@@ -5,7 +5,8 @@
  * SentinAI multi-model AI API gateway
  * OpenAPI spec version: 0.1.0
  */
+import type { LogEntry } from "./logEntry";
 
-export interface HealthStatus {
-  status: string;
+export interface LogsResponse {
+  logs: LogEntry[];
 }

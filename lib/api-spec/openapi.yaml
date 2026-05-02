@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SentinAI multi-model AI API gateway
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: chat
+    description: Chat operations
+  - name: stats
+    description: Stats and analytics
 paths:
   /healthz:
     get:
@@ -24,6 +28,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /chat:
+    post:
+      operationId: chat
+      tags: [chat]
+      summary: Send a chat prompt to a model
+      description: Routes prompt to the selected LLM provider with automatic fallback on failure or rate limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+        "429":
+          description: Rate limit exceeded for all models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: All models failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get gateway statistics
+      description: Returns total requests, per-model stats, costs, and blocked request count
+      responses:
+        "200":
+          description: Stats data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [stats]
+      summary: Get recent traffic logs
+      description: Returns the last 20 request log entries
+      responses:
+        "200":
+          description: Traffic log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogsResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +99,142 @@ components:
       required:
         - status
 
+    ChatRequest:
+      type: object
+      properties:
+        prompt:
+          type: string
+        model:
+          type: string
+          enum: [openai, gemini, claude]
+        apiKey:
+          type: ["string", "null"]
+      required:
+        - prompt
+        - model
+
+    ChatResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        model:
+          type: string
+        modelUsed:
+          type: string
+        fallback:
+          type: boolean
+        tokens:
+          type: integer
+        cost:
+          type: number
+        latencyMs:
+          type: integer
+        status:
+          type: string
+          enum: [success, fallback, blocked]
+      required:
+        - response
+        - model
+        - modelUsed
+        - fallback
+        - tokens
+        - cost
+        - latencyMs
+        - status
+
+    ModelStats:
+      type: object
+      properties:
+        requests:
+          type: integer
+        tokens:
+          type: integer
+        cost:
+          type: number
+        totalLatencyMs:
+          type: integer
+        avgLatencyMs:
+          type: number
+      required:
+        - requests
+        - tokens
+        - cost
+        - totalLatencyMs
+        - avgLatencyMs
+
+    StatsResponse:
+      type: object
+      properties:
+        totalRequests:
+          type: integer
+        blockedRequests:
+          type: integer
+        models:
+          type: object
+          properties:
+            openai:
+              $ref: "#/components/schemas/ModelStats"
+            gemini:
+              $ref: "#/components/schemas/ModelStats"
+            claude:
+              $ref: "#/components/schemas/ModelStats"
+          required:
+            - openai
+            - gemini
+            - claude
+      required:
+        - totalRequests
+        - blockedRequests
+        - models
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+        model:
+          type: string
+        modelUsed:
+          type: string
+        tokens:
+          type: integer
+        cost:
+          type: number
+        latencyMs:
+          type: integer
+        status:
+          type: string
+          enum: [success, fallback, blocked]
+        promptSnippet:
+          type: string
+      required:
+        - id
+        - timestamp
+        - model
+        - modelUsed
+        - tokens
+        - cost
+        - latencyMs
+        - status
+        - promptSnippet
+
+    LogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+      required:
+        - logs
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
