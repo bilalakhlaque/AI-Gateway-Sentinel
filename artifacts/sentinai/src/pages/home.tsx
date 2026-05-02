@@ -20,7 +20,7 @@ import { format } from "date-fns";
 
 const MODEL_OPTIONS = [
   { value: "openai", label: "OpenAI GPT-5.4" },
-  { value: "gemini", label: "Gemini 2.5 Flash" },
+  { value: "gemini", label: "Gemini 3.1 Pro" },
   { value: "claude", label: "Claude Sonnet 4.6" },
   { value: "claude-opus", label: "Claude Opus 4.7" },
 ];
@@ -35,7 +35,7 @@ interface PendingFallback {
 
 const MODEL_LABELS: Record<ModelKey, string> = {
   openai: "OpenAI GPT-5.4",
-  gemini: "Gemini 2.5 Flash",
+  gemini: "Gemini 3.1 Pro",
   claude: "Claude Sonnet 4.6",
   "claude-opus": "Claude Opus 4.7",
 };
