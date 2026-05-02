@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { isRateLimited } from "../lib/rateLimiter";
-import { callWithFallback, type ModelName } from "../lib/llmGateway";
+import { callWithFallback, AllModelsFailedError, type ModelName } from "../lib/llmGateway";
 import { recordRequest } from "../lib/statsStore";
 import { ChatBody } from "@workspace/api-zod";
 
@@ -25,6 +25,7 @@ router.post("/chat", async (req, res): Promise<void> => {
       latencyMs: 0,
       status: "blocked",
       promptSnippet: prompt.slice(0, 80),
+      errorMessage: "Rate limit exceeded (max 10 requests/min)",
     });
     res.status(429).json({ error: "Rate limit exceeded (max 10 requests/min)" });
     return;
@@ -53,18 +54,28 @@ router.post("/chat", async (req, res): Promise<void> => {
       cost: result.cost,
       latencyMs: result.latencyMs,
       status,
+      errorMessage: null,
     });
-  } catch {
+  } catch (err) {
+    const errorMessage =
+      err instanceof AllModelsFailedError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : "Unknown error";
+
     recordRequest({
       model: model as ModelName,
       modelUsed: model as ModelName,
       tokens: 0,
       cost: 0,
       latencyMs: 0,
-      status: "blocked",
+      status: "error",
       promptSnippet: prompt.slice(0, 80),
+      errorMessage,
     });
-    res.status(500).json({ error: "All models failed" });
+
+    res.status(500).json({ error: errorMessage });
   }
 });
 

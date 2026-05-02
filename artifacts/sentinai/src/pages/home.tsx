@@ -339,14 +339,25 @@ export default function Home() {
                         <TableCell className="text-right text-slate-300">{log.latencyMs}ms</TableCell>
                         <TableCell className="text-right text-emerald-400">${log.cost.toFixed(6)}</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant="outline" className={`
-                            text-[10px] py-0 px-2 h-5 border-none
-                            ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
-                            ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
-                            ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
-                          `}>
-                            {log.status.toUpperCase()}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant="outline" className={`
+                              text-[10px] py-0 px-2 h-5 border-none whitespace-nowrap
+                              ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
+                              ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
+                              ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
+                              ${log.status === 'error' ? 'bg-rose-500/10 text-rose-300' : ''}
+                            `}>
+                              {log.status.toUpperCase()}
+                            </Badge>
+                            {log.errorMessage && (
+                              <span
+                                className="text-[10px] font-mono text-rose-400/80 max-w-[220px] truncate block text-right"
+                                title={log.errorMessage}
+                              >
+                                {log.errorMessage}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

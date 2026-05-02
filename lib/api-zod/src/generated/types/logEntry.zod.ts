@@ -15,8 +15,9 @@ export const LogEntry = zod.object({
   tokens: zod.number(),
   cost: zod.number(),
   latencyMs: zod.number(),
-  status: zod.enum(["success", "fallback", "blocked"]),
+  status: zod.enum(["success", "fallback", "blocked", "error"]),
   promptSnippet: zod.string(),
+  errorMessage: zod.string().nullish(),
 });
 
 export type LogEntry = zod.input<typeof LogEntry>;

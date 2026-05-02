@@ -17,8 +17,9 @@ export const LogsResponse = zod.object({
       tokens: zod.number(),
       cost: zod.number(),
       latencyMs: zod.number(),
-      status: zod.enum(["success", "fallback", "blocked"]),
+      status: zod.enum(["success", "fallback", "blocked", "error"]),
       promptSnippet: zod.string(),
+      errorMessage: zod.string().nullish(),
     }),
   ),
 });

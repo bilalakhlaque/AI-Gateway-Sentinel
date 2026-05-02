@@ -32,6 +32,7 @@ export const ChatResponseStatus = {
   success: "success",
   fallback: "fallback",
   blocked: "blocked",
+  error: "error",
 } as const;
 
 export interface ChatResponse {
@@ -43,6 +44,8 @@ export interface ChatResponse {
   cost: number;
   latencyMs: number;
   status: ChatResponseStatus;
+  /** @nullable */
+  errorMessage?: string | null;
 }
 
 export interface ModelStats {
@@ -72,6 +75,7 @@ export const LogEntryStatus = {
   success: "success",
   fallback: "fallback",
   blocked: "blocked",
+  error: "error",
 } as const;
 
 export interface LogEntry {
@@ -84,6 +88,8 @@ export interface LogEntry {
   latencyMs: number;
   status: LogEntryStatus;
   promptSnippet: string;
+  /** @nullable */
+  errorMessage?: string | null;
 }
 
 export interface LogsResponse {

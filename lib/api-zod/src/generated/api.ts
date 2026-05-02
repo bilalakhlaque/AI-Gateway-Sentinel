@@ -33,7 +33,8 @@ export const ChatResponse = zod.object({
   tokens: zod.number(),
   cost: zod.number(),
   latencyMs: zod.number(),
-  status: zod.enum(["success", "fallback", "blocked"]),
+  status: zod.enum(["success", "fallback", "blocked", "error"]),
+  errorMessage: zod.string().nullish(),
 });
 
 /**
@@ -82,8 +83,9 @@ export const GetLogsResponse = zod.object({
       tokens: zod.number(),
       cost: zod.number(),
       latencyMs: zod.number(),
-      status: zod.enum(["success", "fallback", "blocked"]),
+      status: zod.enum(["success", "fallback", "blocked", "error"]),
       promptSnippet: zod.string(),
+      errorMessage: zod.string().nullish(),
     }),
   ),
 });

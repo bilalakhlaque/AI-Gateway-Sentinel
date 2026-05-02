@@ -38,7 +38,7 @@ async function callOpenAI(prompt: string): Promise<{ text: string; tokens: numbe
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`OpenAI error ${res.status}: ${err}`);
+    throw new Error(`OpenAI ${res.status}: ${err}`);
   }
 
   const data = (await res.json()) as {
@@ -57,7 +57,7 @@ async function callGemini(prompt: string): Promise<{ text: string; tokens: numbe
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -69,7 +69,7 @@ async function callGemini(prompt: string): Promise<{ text: string; tokens: numbe
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Gemini error ${res.status}: ${err}`);
+    throw new Error(`Gemini ${res.status}: ${err}`);
   }
 
   const data = (await res.json()) as {
@@ -94,7 +94,7 @@ async function callClaude(prompt: string): Promise<{ text: string; tokens: numbe
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -102,7 +102,7 @@ async function callClaude(prompt: string): Promise<{ text: string; tokens: numbe
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Claude error ${res.status}: ${err}`);
+    throw new Error(`Claude ${res.status}: ${err}`);
   }
 
   const data = (await res.json()) as {
@@ -121,6 +121,18 @@ const callers: Record<ModelName, (prompt: string) => Promise<{ text: string; tok
   claude: callClaude,
 };
 
+export class AllModelsFailedError extends Error {
+  public readonly perModelErrors: Record<string, string>;
+
+  constructor(perModelErrors: Record<string, string>) {
+    const summary = Object.entries(perModelErrors)
+      .map(([m, e]) => `${m}: ${e}`)
+      .join(" | ");
+    super(`All models failed — ${summary}`);
+    this.perModelErrors = perModelErrors;
+  }
+}
+
 export async function callWithFallback(
   requestedModel: ModelName,
   prompt: string,
@@ -128,6 +140,8 @@ export async function callWithFallback(
 ): Promise<LLMResult> {
   const order = [requestedModel, ...MODEL_ORDER.filter((m) => m !== requestedModel)];
   const candidates = order.filter((m) => !unavailable.has(m));
+
+  const perModelErrors: Record<string, string> = {};
 
   for (const model of candidates) {
     const start = Date.now();
@@ -145,9 +159,11 @@ export async function callWithFallback(
         fallback: model !== requestedModel,
       };
     } catch (err) {
-      logger.warn({ model, err }, "Model call failed, trying next");
+      const msg = err instanceof Error ? err.message : String(err);
+      perModelErrors[model] = msg;
+      logger.warn({ model, err: msg }, "Model call failed, trying next");
     }
   }
 
-  throw new Error("All models failed or unavailable");
+  throw new AllModelsFailedError(perModelErrors);
 }

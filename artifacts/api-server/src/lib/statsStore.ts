@@ -1,5 +1,7 @@
 export type ModelName = "openai" | "gemini" | "claude";
 
+export type RequestStatus = "success" | "fallback" | "blocked" | "error";
+
 interface ModelStats {
   requests: number;
   tokens: number;
@@ -15,8 +17,9 @@ interface LogEntry {
   tokens: number;
   cost: number;
   latencyMs: number;
-  status: "success" | "fallback" | "blocked";
+  status: RequestStatus;
   promptSnippet: string;
+  errorMessage?: string | null;
 }
 
 const modelStats: Record<ModelName, ModelStats> = {
@@ -35,11 +38,12 @@ export function recordRequest(entry: {
   tokens: number;
   cost: number;
   latencyMs: number;
-  status: "success" | "fallback" | "blocked";
+  status: RequestStatus;
   promptSnippet: string;
+  errorMessage?: string | null;
 }): void {
   totalRequests++;
-  if (entry.status === "blocked") {
+  if (entry.status === "blocked" || entry.status === "error") {
     blockedRequests++;
   } else {
     const s = modelStats[entry.modelUsed];

@@ -15,7 +15,8 @@ export const ChatResponse = zod.object({
   tokens: zod.number(),
   cost: zod.number(),
   latencyMs: zod.number(),
-  status: zod.enum(["success", "fallback", "blocked"]),
+  status: zod.enum(["success", "fallback", "blocked", "error"]),
+  errorMessage: zod.string().nullish(),
 });
 
 export type ChatResponse = zod.input<typeof ChatResponse>;
