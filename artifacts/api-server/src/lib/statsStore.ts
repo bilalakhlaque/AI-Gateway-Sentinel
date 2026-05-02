@@ -157,6 +157,10 @@ export function getLogs(tenantId?: string): LogEntry[] {
   return all.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 20);
 }
 
+export function getModelCost(tenantId: string, model: ModelName): number {
+  return getBucket(tenantId).modelStats[model].cost;
+}
+
 export function getTenants() {
   const result: Array<{
     tenantId: string;

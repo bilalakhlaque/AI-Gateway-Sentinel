@@ -18,10 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
+import { useBudgets, type ModelKey as BudgetModelKey } from "@/hooks/useBudgets";
 import { useTenantId, PRESET_TENANTS } from "@/hooks/useTenantId";
 
 const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
@@ -97,6 +98,7 @@ type Mode = "single" | "compare";
 export default function Home() {
   const queryClient = useQueryClient();
   const { keys, updateKey, getModelKeys, hasAnyKey } = useApiKeys();
+  const { budgets, setBudget, getActiveBudgets } = useBudgets();
   const { tenantId, setTenantId } = useTenantId();
   const [showTenantPicker, setShowTenantPicker] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -134,7 +136,7 @@ export default function Home() {
     setPendingFallback(null);
     setLastError(null);
 
-    chatMutation.mutate({ data: { prompt, model: targetModel, tenantId, modelKeys: getModelKeys() as any } }, {
+    chatMutation.mutate({ data: { prompt, model: targetModel, tenantId, budgets: getActiveBudgets() as any, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setLastResponse(data);
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
@@ -165,7 +167,7 @@ export default function Home() {
     setPiiWarning(null);
     setCompareResults(null);
     setLastComparePrompt(prompt);
-    compareMutation.mutate({ data: { prompt, tenantId, modelKeys: getModelKeys() as any } }, {
+    compareMutation.mutate({ data: { prompt, tenantId, budgets: getActiveBudgets() as any, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setCompareResults(
           Object.entries(data.results as Record<string, any>).map(([model, r]) => ({ model, ...(r as any) }))
@@ -824,7 +826,35 @@ export default function Home() {
 
         {/* Right Column: Stats & Logs */}
         <div className="xl:col-span-8 flex flex-col gap-6">
-          
+
+          {/* Budget Alert Banner */}
+          {(["openai", "gemini", "claude", "claude-opus"] as const).some(m => {
+            const budget = budgets[m as BudgetModelKey];
+            const cost = (stats?.models as any)?.[m]?.cost ?? 0;
+            return budget !== undefined && cost >= budget;
+          }) && (
+            <div className="flex flex-col gap-2">
+              {(["openai", "gemini", "claude", "claude-opus"] as const).map(m => {
+                const budget = budgets[m as BudgetModelKey];
+                const cost = (stats?.models as any)?.[m]?.cost ?? 0;
+                if (budget === undefined || cost < budget) return null;
+                const fallback = { openai: "gemini", gemini: "claude", claude: "claude-opus", "claude-opus": null }[m];
+                return (
+                  <div key={m} className="flex items-center gap-3 bg-rose-950/60 border border-rose-500/50 rounded-lg px-4 py-2.5 shadow-lg shadow-rose-900/20 animate-pulse-once">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-mono text-rose-300 font-medium">{MODEL_LABELS[m]} budget exceeded</span>
+                      <span className="text-[11px] font-mono text-rose-500 ml-2">${cost.toFixed(6)} / ${budget.toFixed(4)} limit</span>
+                    </div>
+                    {fallback && (
+                      <span className="text-[10px] font-mono text-rose-400/70 shrink-0">→ falling back to {MODEL_LABELS[fallback as ModelKey]}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Top Stats Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
@@ -859,12 +889,22 @@ export default function Home() {
               {(["openai", "gemini", "claude", "claude-opus"] as const).map(m => {
                 const ms = (stats?.models as any)?.[m] || { requests: 0, avgLatencyMs: 0, cost: 0, tokens: 0 };
                 const label = MODEL_LABELS[m];
+                const budget = budgets[m as BudgetModelKey];
+                const isOverBudget = budget !== undefined && ms.cost >= budget;
+                const budgetPct = budget !== undefined && budget > 0 ? Math.min(ms.cost / budget, 1) : null;
                 return (
-                  <Card key={m} className="bg-slate-900/50 border-slate-800 shadow-lg">
+                  <Card key={m} className={`bg-slate-900/50 shadow-lg transition-colors ${isOverBudget ? "border-rose-500/70 shadow-rose-900/30" : "border-slate-800"}`}>
                     <CardHeader className="p-3 pb-2 border-b border-slate-800/50">
                       <CardTitle className="text-xs font-mono text-slate-200 flex items-center justify-between gap-1">
                         <span className="truncate">{label}</span>
-                        <div className="w-2 h-2 rounded-full bg-cyan-500/50 shrink-0" />
+                        {isOverBudget ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <AlertTriangle className="w-3 h-3 text-rose-400 animate-pulse" />
+                            <span className="text-[9px] font-mono text-rose-400 uppercase tracking-wide">Budget</span>
+                          </div>
+                        ) : (
+                          <div className="w-2 h-2 rounded-full bg-cyan-500/50 shrink-0" />
+                        )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 flex flex-col gap-2">
@@ -882,8 +922,22 @@ export default function Home() {
                       </div>
                       <div className="flex justify-between items-center pt-1.5 border-t border-slate-800/50 mt-0.5">
                         <span className="text-[10px] font-mono text-slate-500 flex items-center gap-1"><Coins className="w-2.5 h-2.5" /> Cost</span>
-                        <span className="text-xs font-mono text-emerald-400">${ms.cost.toFixed(6)}</span>
+                        <span className={`text-xs font-mono ${isOverBudget ? "text-rose-400" : "text-emerald-400"}`}>${ms.cost.toFixed(6)}</span>
                       </div>
+                      {budgetPct !== null && (
+                        <div className="mt-0.5">
+                          <div className="flex justify-between mb-0.5">
+                            <span className="text-[9px] font-mono text-slate-600">limit: ${budget!.toFixed(4)}</span>
+                            <span className={`text-[9px] font-mono ${isOverBudget ? "text-rose-400" : "text-slate-500"}`}>{(budgetPct * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${isOverBudget ? "bg-rose-500" : budgetPct > 0.8 ? "bg-amber-500" : "bg-cyan-500"}`}
+                              style={{ width: `${budgetPct * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )
@@ -1203,6 +1257,8 @@ export default function Home() {
         onClose={() => setShowSettings(false)}
         keys={keys}
         onUpdate={updateKey}
+        budgets={budgets}
+        onBudget={setBudget}
       />
     </div>
   );

@@ -10,6 +10,14 @@ import { z as zod } from "zod";
 export const CompareRequest = zod.object({
   prompt: zod.string(),
   tenantId: zod.string().optional(),
+  budgets: zod
+    .object({
+      openai: zod.number().optional(),
+      gemini: zod.number().optional(),
+      claude: zod.number().optional(),
+      "claude-opus": zod.number().optional(),
+    })
+    .optional(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),

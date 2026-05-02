@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { callModel, type ModelName, type ModelKeys } from "../lib/llmGateway";
-import { recordRequest } from "../lib/statsStore";
+import { callModel, FALLBACK_NEXT, type ModelName, type ModelKeys } from "../lib/llmGateway";
+import { recordRequest, getModelCost } from "../lib/statsStore";
 import { detectPii } from "../lib/piiDetector";
 import { detectPromptInjection } from "../lib/promptInjectionDetector";
 import { z } from "zod";
@@ -15,9 +15,19 @@ const ModelKeysSchema = z
   })
   .optional();
 
+const BudgetMapSchema = z
+  .object({
+    openai: z.number().optional(),
+    gemini: z.number().optional(),
+    claude: z.number().optional(),
+    "claude-opus": z.number().optional(),
+  })
+  .optional();
+
 const CompareBody = z.object({
   prompt: z.string().min(1),
   tenantId: z.string().optional(),
+  budgets: BudgetMapSchema,
   modelKeys: ModelKeysSchema,
 });
 
@@ -30,7 +40,7 @@ router.post("/compare", async (req, res): Promise<void> => {
     return;
   }
 
-  const { prompt, modelKeys, tenantId = "default" } = parsed.data;
+  const { prompt, modelKeys, tenantId = "default", budgets } = parsed.data;
 
   const piiMatches = detectPii(prompt);
   if (piiMatches.length > 0) {
@@ -45,7 +55,15 @@ router.post("/compare", async (req, res): Promise<void> => {
   }
 
   const settled = await Promise.allSettled(
-    ALL_MODELS.map((model) => callModel(model, prompt, modelKeys as ModelKeys)),
+    ALL_MODELS.map((model) => {
+      const modelBudget = budgets?.[model as keyof typeof budgets];
+      if (modelBudget !== undefined && getModelCost(tenantId, model) >= modelBudget) {
+        return Promise.reject(
+          new Error(`Budget limit of $${modelBudget.toFixed(4)} reached for ${model}`)
+        );
+      }
+      return callModel(model, prompt, modelKeys as ModelKeys);
+    }),
   );
 
   const results: Record<string, object> = {};
@@ -54,46 +72,17 @@ router.post("/compare", async (req, res): Promise<void> => {
     const outcome = settled[i];
     if (outcome.status === "fulfilled") {
       const r = outcome.value;
-      results[model] = {
-        response: r.response,
-        tokens: r.tokens,
-        cost: r.cost,
-        latencyMs: r.latencyMs,
-        status: "success",
-        error: null,
-      };
+      results[model] = { response: r.response, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs, status: "success", error: null };
       recordRequest(tenantId, {
-        model,
-        modelUsed: r.modelUsed,
-        tokens: r.tokens,
-        cost: r.cost,
-        latencyMs: r.latencyMs,
-        status: "success",
-        promptSnippet: prompt.slice(0, 80),
-        responseText: r.response,
+        model, modelUsed: r.modelUsed, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs,
+        status: "success", promptSnippet: prompt.slice(0, 80), responseText: r.response,
       });
     } else {
-      const msg =
-        outcome.reason instanceof Error
-          ? outcome.reason.message
-          : String(outcome.reason);
-      results[model] = {
-        response: null,
-        tokens: 0,
-        cost: 0,
-        latencyMs: 0,
-        status: "error",
-        error: msg,
-      };
+      const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      results[model] = { response: null, tokens: 0, cost: 0, latencyMs: 0, status: "error", error: msg };
       recordRequest(tenantId, {
-        model,
-        modelUsed: model,
-        tokens: 0,
-        cost: 0,
-        latencyMs: 0,
-        status: "error",
-        promptSnippet: prompt.slice(0, 80),
-        errorMessage: msg,
+        model, modelUsed: model, tokens: 0, cost: 0, latencyMs: 0,
+        status: "error", promptSnippet: prompt.slice(0, 80), errorMessage: msg,
       });
     }
   }

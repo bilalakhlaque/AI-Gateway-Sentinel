@@ -188,6 +188,18 @@ components:
         - error
         - piiMatches
 
+    BudgetMap:
+      type: object
+      properties:
+        openai:
+          type: number
+        gemini:
+          type: number
+        claude:
+          type: number
+        claude-opus:
+          type: number
+
     CompareRequest:
       type: object
       properties:
@@ -195,6 +207,8 @@ components:
           type: string
         tenantId:
           type: string
+        budgets:
+          $ref: "#/components/schemas/BudgetMap"
         modelKeys:
           $ref: "#/components/schemas/ModelKeys"
       required:
@@ -256,6 +270,8 @@ components:
           type: ["string", "null"]
         tenantId:
           type: string
+        budgets:
+          $ref: "#/components/schemas/BudgetMap"
         modelKeys:
           $ref: "#/components/schemas/ModelKeys"
       required:

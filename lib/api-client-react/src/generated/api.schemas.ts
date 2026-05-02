@@ -33,9 +33,17 @@ export interface PiiBlockedResponse {
   piiMatches: PiiMatch[];
 }
 
+export interface BudgetMap {
+  openai?: number;
+  gemini?: number;
+  claude?: number;
+  "claude-opus"?: number;
+}
+
 export interface CompareRequest {
   prompt: string;
   tenantId?: string;
+  budgets?: BudgetMap;
   modelKeys?: ModelKeys;
 }
 
@@ -85,6 +93,7 @@ export interface ChatRequest {
   /** @nullable */
   apiKey?: string | null;
   tenantId?: string;
+  budgets?: BudgetMap;
   modelKeys?: ModelKeys;
 }
 

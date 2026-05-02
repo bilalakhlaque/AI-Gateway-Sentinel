@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./budgetMap.zod";
 export * from "./chatBody.zod";
 export * from "./chatFailedResponse.zod";
 export * from "./chatRequest.zod";
