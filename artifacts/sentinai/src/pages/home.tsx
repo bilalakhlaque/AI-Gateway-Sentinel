@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
 import { format } from "date-fns";
 
 const MODEL_OPTIONS = [
@@ -48,6 +48,7 @@ export default function Home() {
   const [pendingFallback, setPendingFallback] = useState<PendingFallback | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [isLogFullscreen, setIsLogFullscreen] = useState(false);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
@@ -106,6 +107,114 @@ export default function Home() {
   ] : [];
 
   const logs = logsData?.logs || [];
+
+  const logTable = (
+    <Table>
+      <TableHeader className="bg-slate-950/80 sticky top-0 z-10 backdrop-blur-sm shadow-sm border-b border-slate-800">
+        <TableRow className="border-none hover:bg-transparent">
+          <TableHead className="font-mono text-xs text-slate-500 h-10">TIME</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10">TARGET</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10">USED</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10">PROMPT</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">TOKENS</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">LATENCY</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">COST</TableHead>
+          <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">STATUS</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody className="font-mono text-sm">
+        {logs.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={8} className="text-center py-8 text-slate-500 h-32">
+              NO TRAFFIC DETECTED
+            </TableCell>
+          </TableRow>
+        ) : (
+          logs.map((log: any) => {
+            const isExpanded = expandedLogId === log.id;
+            return (
+              <React.Fragment key={log.id}>
+                <TableRow
+                  className="border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer select-none"
+                  onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                >
+                  <TableCell className="text-slate-400 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      {isExpanded
+                        ? <ChevronUp className="w-3 h-3 text-cyan-400 shrink-0" />
+                        : <ChevronDown className="w-3 h-3 text-slate-600 shrink-0" />}
+                      {format(new Date(log.timestamp), "HH:mm:ss.SSS")}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-slate-300">{log.model}</TableCell>
+                  <TableCell className={log.model !== log.modelUsed ? "text-amber-400" : "text-cyan-400"}>{log.modelUsed}</TableCell>
+                  <TableCell className="text-slate-400 max-w-[200px] truncate">{log.promptSnippet}</TableCell>
+                  <TableCell className="text-right text-slate-300">{log.tokens}</TableCell>
+                  <TableCell className="text-right text-slate-300">{log.latencyMs}ms</TableCell>
+                  <TableCell className="text-right text-emerald-400">${log.cost.toFixed(6)}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant="outline" className={`
+                      text-[10px] py-0 px-2 h-5 border-none whitespace-nowrap
+                      ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
+                      ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
+                      ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
+                      ${log.status === 'error' ? 'bg-rose-500/10 text-rose-300' : ''}
+                    `}>
+                      {log.status.toUpperCase()}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+                {isExpanded && (
+                  <TableRow className="border-slate-800/50 bg-slate-950/60 hover:bg-slate-950/60">
+                    <TableCell colSpan={8} className="px-6 py-3">
+                      <div className="flex flex-col gap-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Prompt</span>
+                            <p className="mt-1 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-800 rounded bg-slate-900/60 p-3 max-h-48 overflow-y-auto">
+                              {log.promptSnippet}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-mono text-cyan-500 uppercase tracking-wider">Response</span>
+                            {log.responseText ? (
+                              <p className="mt-1 text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed border border-cyan-900/40 rounded bg-cyan-950/10 p-3 max-h-48 overflow-y-auto">
+                                {log.responseText}
+                              </p>
+                            ) : (
+                              <p className="mt-1 text-xs font-mono text-slate-600 italic border border-slate-800 rounded bg-slate-900/60 p-3">
+                                No response recorded
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {log.errorMessage && (
+                          <div>
+                            <span className="text-[10px] font-mono text-rose-500 uppercase tracking-wider">Error</span>
+                            <p className="mt-1 text-xs font-mono text-rose-400 whitespace-pre-wrap leading-relaxed border border-rose-900/40 rounded bg-rose-950/20 p-3">
+                              {log.errorMessage}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-6">
+                          <span className="text-[10px] font-mono text-slate-500">
+                            ID: <span className="text-slate-400">{log.id}</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss.SSS")}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
+            );
+          })
+        )}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30 flex flex-col">
@@ -427,117 +536,51 @@ export default function Home() {
               </CardTitle>
             </CardHeader>
             <div className="flex-1 overflow-auto min-h-[300px]">
-              <Table>
-                <TableHeader className="bg-slate-950/80 sticky top-0 z-10 backdrop-blur-sm shadow-sm border-b border-slate-800">
-                  <TableRow className="border-none hover:bg-transparent">
-                    <TableHead className="font-mono text-xs text-slate-500 h-10">TIME</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10">TARGET</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10">USED</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10">PROMPT</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">TOKENS</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">LATENCY</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">COST</TableHead>
-                    <TableHead className="font-mono text-xs text-slate-500 h-10 text-right">STATUS</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="font-mono text-sm">
-                  {logs.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-slate-500 h-32">
-                        NO TRAFFIC DETECTED
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    logs.map((log: any) => {
-                      const isExpanded = expandedLogId === log.id;
-                      return (
-                        <React.Fragment key={log.id}>
-                          <TableRow
-                            className="border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer select-none"
-                            onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                          >
-                            <TableCell className="text-slate-400 whitespace-nowrap">
-                              <div className="flex items-center gap-1">
-                                {isExpanded
-                                  ? <ChevronUp className="w-3 h-3 text-cyan-400 shrink-0" />
-                                  : <ChevronDown className="w-3 h-3 text-slate-600 shrink-0" />}
-                                {format(new Date(log.timestamp), "HH:mm:ss.SSS")}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-slate-300">{log.model}</TableCell>
-                            <TableCell className={log.model !== log.modelUsed ? "text-amber-400" : "text-cyan-400"}>{log.modelUsed}</TableCell>
-                            <TableCell className="text-slate-400 max-w-[200px] truncate">
-                              {log.promptSnippet}
-                            </TableCell>
-                            <TableCell className="text-right text-slate-300">{log.tokens}</TableCell>
-                            <TableCell className="text-right text-slate-300">{log.latencyMs}ms</TableCell>
-                            <TableCell className="text-right text-emerald-400">${log.cost.toFixed(6)}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="outline" className={`
-                                text-[10px] py-0 px-2 h-5 border-none whitespace-nowrap
-                                ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : ''}
-                                ${log.status === 'fallback' ? 'bg-amber-500/10 text-amber-400' : ''}
-                                ${log.status === 'blocked' ? 'bg-rose-500/10 text-rose-400' : ''}
-                                ${log.status === 'error' ? 'bg-rose-500/10 text-rose-300' : ''}
-                              `}>
-                                {log.status.toUpperCase()}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                          {isExpanded && (
-                            <TableRow className="border-slate-800/50 bg-slate-950/60 hover:bg-slate-950/60">
-                              <TableCell colSpan={8} className="px-6 py-3">
-                                <div className="flex flex-col gap-3">
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Prompt</span>
-                                      <p className="mt-1 text-xs font-mono text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-800 rounded bg-slate-900/60 p-3 max-h-48 overflow-y-auto">
-                                        {log.promptSnippet}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="text-[10px] font-mono text-cyan-500 uppercase tracking-wider">Response</span>
-                                      {log.responseText ? (
-                                        <p className="mt-1 text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed border border-cyan-900/40 rounded bg-cyan-950/10 p-3 max-h-48 overflow-y-auto">
-                                          {log.responseText}
-                                        </p>
-                                      ) : (
-                                        <p className="mt-1 text-xs font-mono text-slate-600 italic border border-slate-800 rounded bg-slate-900/60 p-3">
-                                          No response recorded
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {log.errorMessage && (
-                                    <div>
-                                      <span className="text-[10px] font-mono text-rose-500 uppercase tracking-wider">Error</span>
-                                      <p className="mt-1 text-xs font-mono text-rose-400 whitespace-pre-wrap leading-relaxed border border-rose-900/40 rounded bg-rose-950/20 p-3">
-                                        {log.errorMessage}
-                                      </p>
-                                    </div>
-                                  )}
-                                  <div className="flex items-center gap-6">
-                                    <span className="text-[10px] font-mono text-slate-500">
-                                      ID: <span className="text-slate-400">{log.id}</span>
-                                    </span>
-                                    <span className="text-[10px] font-mono text-slate-500">
-                                      {format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss.SSS")}
-                                    </span>
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+              {logTable}
+            </div>
+            <div className="p-3 border-t border-slate-800/50 bg-slate-900/80 flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-3 text-xs font-mono text-slate-400 hover:text-cyan-400 hover:bg-slate-800 gap-2"
+                onClick={() => setIsLogFullscreen(true)}
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                Expand Log
+              </Button>
             </div>
           </Card>
         </div>
       </main>
+
+      {/* Fullscreen Log Overlay */}
+      {isLogFullscreen && (
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-cyan-500/10 p-2 rounded-lg border border-cyan-500/20">
+                <Clock className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-mono text-slate-200 font-semibold tracking-wide">Traffic Log</h2>
+                <p className="text-[10px] font-mono text-slate-500">Last 20 entries · click any row to expand</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 gap-2"
+              onClick={() => setIsLogFullscreen(false)}
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              Collapse
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            {logTable}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
