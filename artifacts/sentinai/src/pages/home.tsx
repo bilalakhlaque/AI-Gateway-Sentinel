@@ -15,8 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal } from "lucide-react";
+import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
@@ -180,6 +180,54 @@ export default function Home() {
     setPendingFallback(null);
     queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
   };
+
+  const exportCsv = () => {
+    const logs = logsData?.logs ?? [];
+    if (logs.length === 0) return;
+    const header = ["timestamp", "model", "model_used", "status", "tokens", "latency_ms", "cost_usd", "prompt_snippet"].join(",");
+    const rows = logs.map((l: any) => [
+      `"${l.timestamp}"`,
+      `"${l.model}"`,
+      `"${l.modelUsed}"`,
+      `"${l.status}"`,
+      l.tokens ?? 0,
+      l.latencyMs ?? 0,
+      (l.cost ?? 0).toFixed(8),
+      `"${(l.promptSnippet ?? "").replace(/"/g, '""')}"`,
+    ].join(","));
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sentinai-usage-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const MODEL_COLORS: Record<string, string> = {
+    openai: "#22d3ee",
+    gemini: "#a78bfa",
+    claude: "#34d399",
+    "claude-opus": "#fb923c",
+  };
+
+  const latencyChartData = (() => {
+    const logs = (logsData?.logs ?? []).filter((l: any) => l.status !== "blocked" && l.latencyMs > 0);
+    const last30 = logs.slice(-30);
+    return last30.map((l: any, i: number) => {
+      const t = new Date(l.timestamp);
+      const label = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:${String(t.getSeconds()).padStart(2, "0")}`;
+      return {
+        index: i + 1,
+        time: label,
+        openai: l.modelUsed === "openai" ? l.latencyMs : null,
+        gemini: l.modelUsed === "gemini" ? l.latencyMs : null,
+        claude: l.modelUsed === "claude" ? l.latencyMs : null,
+        "claude-opus": l.modelUsed === "claude-opus" ? l.latencyMs : null,
+      };
+    });
+  })();
 
   const chartData = stats ? [
     { name: 'OpenAI', cost: stats.models.openai.cost, fill: 'hsl(var(--chart-1))' },
@@ -738,6 +786,55 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Live Latency Chart */}
+          <Card className="bg-slate-900/50 border-slate-800 shadow-xl">
+            <CardHeader className="p-4 border-b border-slate-800/50">
+              <CardTitle className="text-sm font-mono text-slate-300 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-cyan-400" />
+                Live Latency
+                <span className="ml-auto flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  LIVE · LAST {latencyChartData.length} REQUESTS
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 h-[200px]">
+              {latencyChartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-600 font-mono text-xs">NO DATA YET — SEND A REQUEST</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={latencyChartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tick={{ fill: '#475569', fontSize: 10, fontFamily: 'monospace' }} axisLine={false} tickLine={false} unit="ms" />
+                    <Tooltip
+                      cursor={{ stroke: 'rgba(255,255,255,0.08)' }}
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="bg-slate-900 border border-slate-700 p-2 rounded shadow-xl text-[11px] font-mono">
+                            <p className="text-slate-400 mb-1">{label}</p>
+                            {payload.filter(p => p.value != null).map(p => (
+                              <p key={p.dataKey as string} style={{ color: p.stroke as string }}>
+                                {p.name}: {p.value}ms
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace', paddingTop: '4px' }}
+                      formatter={(value) => <span style={{ color: MODEL_COLORS[value] ?? '#94a3b8' }}>{MODEL_LABELS[value as ModelKey] ?? value}</span>}
+                    />
+                    {(["openai", "gemini", "claude", "claude-opus"] as ModelKey[]).map(m => (
+                      <Line key={m} type="monotone" dataKey={m} name={m} stroke={MODEL_COLORS[m]} strokeWidth={2} dot={{ r: 3, fill: MODEL_COLORS[m] }} connectNulls={false} activeDot={{ r: 5 }} />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Middle Row: Cost Chart */}
           <Card className="bg-slate-900/50 border-slate-800 shadow-xl">
             <CardHeader className="p-4 border-b border-slate-800/50">
@@ -779,9 +876,22 @@ export default function Home() {
                   <Clock className="w-4 h-4 text-cyan-400" />
                   Traffic Log
                 </div>
-                <Badge variant="outline" className="text-[10px] font-mono border-slate-700 bg-slate-800 text-slate-400">
-                  LAST 20 ENTRIES
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] font-mono text-slate-400 hover:text-cyan-400 hover:bg-slate-800 gap-1.5 border border-slate-700"
+                    onClick={exportCsv}
+                    disabled={!logsData?.logs?.length}
+                    title="Download CSV report"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export CSV
+                  </Button>
+                  <Badge variant="outline" className="text-[10px] font-mono border-slate-700 bg-slate-800 text-slate-400">
+                    LAST 20 ENTRIES
+                  </Badge>
+                </div>
               </CardTitle>
             </CardHeader>
             <div className="flex-1 overflow-auto min-h-[300px]">
