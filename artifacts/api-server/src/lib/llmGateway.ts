@@ -2,7 +2,11 @@ import { logger } from "./logger";
 
 export type ModelName = "openai" | "gemini" | "claude";
 
-const MODEL_ORDER: ModelName[] = ["openai", "gemini", "claude"];
+export const FALLBACK_NEXT: Record<ModelName, ModelName | null> = {
+  openai: "gemini",
+  gemini: "claude",
+  claude: null,
+};
 
 const COST_PER_TOKEN: Record<ModelName, number> = {
   openai: 0.000015,
@@ -16,7 +20,6 @@ export interface LLMResult {
   tokens: number;
   cost: number;
   latencyMs: number;
-  fallback: boolean;
 }
 
 async function callOpenAI(prompt: string): Promise<{ text: string; tokens: number }> {
@@ -57,7 +60,7 @@ async function callGemini(prompt: string): Promise<{ text: string; tokens: numbe
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,49 +124,26 @@ const callers: Record<ModelName, (prompt: string) => Promise<{ text: string; tok
   claude: callClaude,
 };
 
-export class AllModelsFailedError extends Error {
-  public readonly perModelErrors: Record<string, string>;
-
-  constructor(perModelErrors: Record<string, string>) {
-    const summary = Object.entries(perModelErrors)
-      .map(([m, e]) => `${m}: ${e}`)
-      .join(" | ");
-    super(`All models failed — ${summary}`);
-    this.perModelErrors = perModelErrors;
+/**
+ * Calls a single model — no automatic fallback.
+ * Throws on failure so the caller can decide what to do next.
+ */
+export async function callModel(model: ModelName, prompt: string): Promise<LLMResult> {
+  const start = Date.now();
+  try {
+    const result = await callers[model](prompt);
+    const latencyMs = Date.now() - start;
+    const cost = result.tokens * COST_PER_TOKEN[model];
+    return {
+      response: result.text,
+      modelUsed: model,
+      tokens: result.tokens,
+      cost,
+      latencyMs,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ model, err: msg }, "Model call failed");
+    throw err;
   }
-}
-
-export async function callWithFallback(
-  requestedModel: ModelName,
-  prompt: string,
-  unavailable: Set<ModelName>,
-): Promise<LLMResult> {
-  const order = [requestedModel, ...MODEL_ORDER.filter((m) => m !== requestedModel)];
-  const candidates = order.filter((m) => !unavailable.has(m));
-
-  const perModelErrors: Record<string, string> = {};
-
-  for (const model of candidates) {
-    const start = Date.now();
-    try {
-      const result = await callers[model](prompt);
-      const latencyMs = Date.now() - start;
-      const tokens = result.tokens;
-      const cost = tokens * COST_PER_TOKEN[model];
-      return {
-        response: result.text,
-        modelUsed: model,
-        tokens,
-        cost,
-        latencyMs,
-        fallback: model !== requestedModel,
-      };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      perModelErrors[model] = msg;
-      logger.warn({ model, err: msg }, "Model call failed, trying next");
-    }
-  }
-
-  throw new AllModelsFailedError(perModelErrors);
 }

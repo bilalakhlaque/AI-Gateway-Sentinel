@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { 
   useChat, 
   useGetStats, 
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, CheckCircle2, Zap, Clock, Coins, Database } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X } from "lucide-react";
 import { format } from "date-fns";
 
 const MODEL_OPTIONS = [
@@ -24,30 +24,75 @@ const MODEL_OPTIONS = [
   { value: "claude", label: "Claude Sonnet 4.6" }
 ];
 
+type ModelKey = "openai" | "gemini" | "claude";
+
+interface PendingFallback {
+  suggestedModel: ModelKey;
+  failedModel: ModelKey;
+  errorMessage: string;
+}
+
+const MODEL_LABELS: Record<ModelKey, string> = {
+  openai: "OpenAI GPT-5.4",
+  gemini: "Gemini 3.1 Pro",
+  claude: "Claude Sonnet 4.6",
+};
+
 export default function Home() {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<"openai" | "gemini" | "claude">("openai");
+  const [model, setModel] = useState<ModelKey>("openai");
   const [lastResponse, setLastResponse] = useState<any>(null);
+  const [pendingFallback, setPendingFallback] = useState<PendingFallback | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
 
   const chatMutation = useChat();
 
-  const handleSend = () => {
+  const sendRequest = (targetModel: ModelKey) => {
     if (!prompt.trim()) return;
-    
-    chatMutation.mutate({ data: { prompt, model } }, {
+    setPendingFallback(null);
+    setLastError(null);
+
+    chatMutation.mutate({ data: { prompt, model: targetModel } }, {
       onSuccess: (data) => {
         setLastResponse(data);
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
       },
-      onError: (err) => {
-        console.error(err);
+      onError: (err: any) => {
+        queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
+        const errData = err?.data as { error?: string; suggestedFallback?: string | null } | undefined;
+        const errorMsg = errData?.error ?? "Request failed";
+        const suggested = errData?.suggestedFallback as ModelKey | null | undefined;
+
+        if (suggested) {
+          setPendingFallback({
+            suggestedModel: suggested,
+            failedModel: targetModel,
+            errorMessage: errorMsg,
+          });
+        } else {
+          setLastError(errorMsg);
+        }
       }
     });
+  };
+
+  const handleSend = () => sendRequest(model);
+
+  const handleConfirmFallback = () => {
+    if (!pendingFallback) return;
+    const fallbackModel = pendingFallback.suggestedModel;
+    setModel(fallbackModel);
+    sendRequest(fallbackModel);
+  };
+
+  const handleDismissFallback = () => {
+    setPendingFallback(null);
+    queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
   };
 
   const chartData = stats ? [
@@ -120,7 +165,7 @@ export default function Home() {
 
               <Button 
                 onClick={handleSend} 
-                disabled={chatMutation.isPending || !prompt.trim()}
+                disabled={chatMutation.isPending || !prompt.trim() || !!pendingFallback}
                 className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-[0_0_15px_rgba(8,145,178,0.3)] hover:shadow-[0_0_20px_rgba(8,145,178,0.5)] transition-all"
               >
                 {chatMutation.isPending ? (
@@ -129,6 +174,77 @@ export default function Home() {
                   <>SEND REQUEST</>
                 )}
               </Button>
+
+              {/* Fallback confirmation banner */}
+              {pendingFallback && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-mono font-semibold text-amber-300">
+                          {MODEL_LABELS[pendingFallback.failedModel]} failed
+                        </span>
+                        <span
+                          className="text-[11px] font-mono text-amber-400/70 leading-relaxed break-all line-clamp-3"
+                          title={pendingFallback.errorMessage}
+                        >
+                          {pendingFallback.errorMessage}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDismissFallback}
+                      className="text-slate-500 hover:text-slate-300 transition-colors shrink-0 mt-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 pl-6">
+                    <span className="text-xs font-mono text-slate-400">Try next model?</span>
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDismissFallback}
+                        className="h-7 px-3 text-xs font-mono border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                      >
+                        No
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleConfirmFallback}
+                        disabled={chatMutation.isPending}
+                        className="h-7 px-3 text-xs font-mono bg-amber-600 hover:bg-amber-500 text-white border-0 flex items-center gap-1.5"
+                      >
+                        {chatMutation.isPending ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <ArrowRight className="w-3 h-3" />
+                        )}
+                        {MODEL_LABELS[pendingFallback.suggestedModel]}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Plain error (no fallback available) */}
+              {lastError && !pendingFallback && (
+                <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                  <div className="flex flex-col gap-1 flex-1">
+                    <span className="text-xs font-mono font-semibold text-rose-300">All models exhausted</span>
+                    <span className="text-[11px] font-mono text-rose-400/70 break-all">{lastError}</span>
+                  </div>
+                  <button
+                    onClick={() => setLastError(null)}
+                    className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

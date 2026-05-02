@@ -49,17 +49,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChatResponse"
         "429":
-          description: Rate limit exceeded for all models
+          description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: All models failed
+                $ref: "#/components/schemas/ChatFailedResponse"
+        "503":
+          description: Model failed — suggestedFallback indicates which model to try next
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ChatFailedResponse"
 
   /stats:
     get:
@@ -234,6 +234,16 @@ components:
             $ref: "#/components/schemas/LogEntry"
       required:
         - logs
+
+    ChatFailedResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        suggestedFallback:
+          type: ["string", "null"]
+      required:
+        - error
 
     ErrorResponse:
       type: object

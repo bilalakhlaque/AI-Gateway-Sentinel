@@ -96,6 +96,12 @@ export interface LogsResponse {
   logs: LogEntry[];
 }
 
+export interface ChatFailedResponse {
+  error: string;
+  /** @nullable */
+  suggestedFallback?: string | null;
+}
+
 export interface ErrorResponse {
   error: string;
 }

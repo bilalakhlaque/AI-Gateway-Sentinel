@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { isRateLimited } from "../lib/rateLimiter";
-import { callWithFallback, AllModelsFailedError, type ModelName } from "../lib/llmGateway";
+import { callModel, FALLBACK_NEXT, type ModelName } from "../lib/llmGateway";
 import { recordRequest } from "../lib/statsStore";
 import { ChatBody } from "@workspace/api-zod";
 
@@ -27,13 +27,15 @@ router.post("/chat", async (req, res): Promise<void> => {
       promptSnippet: prompt.slice(0, 80),
       errorMessage: "Rate limit exceeded (max 10 requests/min)",
     });
-    res.status(429).json({ error: "Rate limit exceeded (max 10 requests/min)" });
+    res.status(429).json({
+      error: "Rate limit exceeded (max 10 requests/min)",
+      suggestedFallback: null,
+    });
     return;
   }
 
   try {
-    const result = await callWithFallback(model as ModelName, prompt, new Set());
-    const status = result.fallback ? "fallback" : "success";
+    const result = await callModel(model as ModelName, prompt);
 
     recordRequest({
       model: model as ModelName,
@@ -41,7 +43,7 @@ router.post("/chat", async (req, res): Promise<void> => {
       tokens: result.tokens,
       cost: result.cost,
       latencyMs: result.latencyMs,
-      status,
+      status: "success",
       promptSnippet: prompt.slice(0, 80),
     });
 
@@ -49,20 +51,16 @@ router.post("/chat", async (req, res): Promise<void> => {
       response: result.response,
       model,
       modelUsed: result.modelUsed,
-      fallback: result.fallback,
+      fallback: false,
       tokens: result.tokens,
       cost: result.cost,
       latencyMs: result.latencyMs,
-      status,
+      status: "success",
       errorMessage: null,
     });
   } catch (err) {
-    const errorMessage =
-      err instanceof AllModelsFailedError
-        ? err.message
-        : err instanceof Error
-          ? err.message
-          : "Unknown error";
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    const suggestedFallback = FALLBACK_NEXT[model as ModelName] ?? null;
 
     recordRequest({
       model: model as ModelName,
@@ -75,7 +73,7 @@ router.post("/chat", async (req, res): Promise<void> => {
       errorMessage,
     });
 
-    res.status(500).json({ error: errorMessage });
+    res.status(503).json({ error: errorMessage, suggestedFallback });
   }
 });
 

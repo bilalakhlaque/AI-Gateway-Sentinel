@@ -17,9 +17,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  ChatFailedResponse,
   ChatRequest,
   ChatResponse,
-  ErrorResponse,
   HealthStatus,
   LogsResponse,
   StatsResponse,
@@ -131,7 +131,7 @@ export const chat = async (
 };
 
 export const getChatMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<ChatFailedResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -170,13 +170,13 @@ export const getChatMutationOptions = <
 
 export type ChatMutationResult = NonNullable<Awaited<ReturnType<typeof chat>>>;
 export type ChatMutationBody = BodyType<ChatRequest>;
-export type ChatMutationError = ErrorType<ErrorResponse>;
+export type ChatMutationError = ErrorType<ChatFailedResponse>;
 
 /**
  * @summary Send a chat prompt to a model
  */
 export const useChat = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<ChatFailedResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

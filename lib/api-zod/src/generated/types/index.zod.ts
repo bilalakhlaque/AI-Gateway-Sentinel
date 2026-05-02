@@ -7,6 +7,7 @@
  */
 
 export * from "./chatBody.zod";
+export * from "./chatFailedResponse.zod";
 export * from "./chatRequest.zod";
 export * from "./chatResponse.zod";
 export * from "./errorResponse.zod";
