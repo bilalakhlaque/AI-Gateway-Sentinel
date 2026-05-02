@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   useChat,
   useCompare,
@@ -107,6 +107,8 @@ export default function Home() {
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isLogFullscreen, setIsLogFullscreen] = useState(false);
   const [isResponseFullscreen, setIsResponseFullscreen] = useState(false);
+  const [isCompareFullscreen, setIsCompareFullscreen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
@@ -182,6 +184,13 @@ export default function Home() {
     setPendingFallback(null);
     queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
   };
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [prompt]);
 
   const exportCsv = () => {
     const logs = logsData?.logs ?? [];
@@ -434,10 +443,12 @@ export default function Home() {
               <div className="flex flex-col gap-2 flex-1">
                 <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Input Prompt</label>
                 <Textarea 
+                  ref={textareaRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Enter prompt here..."
-                  className="flex-1 min-h-[200px] bg-slate-950 border-slate-800 focus-visible:ring-cyan-500/50 font-mono text-sm resize-none"
+                  rows={5}
+                  className="bg-slate-950 border-slate-800 focus-visible:ring-cyan-500/50 font-mono text-sm resize-none overflow-hidden"
                 />
               </div>
 
@@ -715,6 +726,19 @@ export default function Home() {
                   </div>
                 )}
               </CardContent>
+              {compareResults && (
+                <div className="p-3 border-t border-slate-800/50 bg-slate-900/80 flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-3 text-xs font-mono text-slate-400 hover:text-cyan-400 hover:bg-slate-800 gap-2"
+                    onClick={() => setIsCompareFullscreen(true)}
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    Expand All
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -978,6 +1002,73 @@ export default function Home() {
           </div>
         </div>
       )}
+      {/* Fullscreen Compare Overlay */}
+      {isCompareFullscreen && compareResults && (
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-cyan-500/10 p-2 rounded-lg border border-cyan-500/20">
+                <SplitSquareHorizontal className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-mono text-slate-200 font-semibold tracking-wide">Model Comparison</h2>
+                <p className="text-[10px] font-mono text-slate-500 mt-0.5 max-w-xl truncate">
+                  {prompt.length > 100 ? prompt.slice(0, 100) + "…" : prompt}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs font-mono text-slate-400 hover:text-white hover:bg-slate-800 gap-2"
+              onClick={() => setIsCompareFullscreen(false)}
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              Collapse
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-[1400px] mx-auto">
+              {compareResults.map((r: any) => {
+                const label = MODEL_LABELS[r.model as ModelKey] ?? r.model;
+                const isOk = r.status === "success";
+                return (
+                  <div key={r.model} className={`rounded-xl border p-4 flex flex-col gap-3 ${isOk ? "border-slate-700 bg-slate-900/60" : "border-rose-900/40 bg-rose-950/10"}`}>
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800/60">
+                      <span className="text-sm font-mono font-semibold text-slate-100">{label}</span>
+                      <Badge className={`text-[10px] shrink-0 ${isOk ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border-rose-500/30"}`}>
+                        {isOk ? "OK" : "FAILED"}
+                      </Badge>
+                    </div>
+                    {isOk ? (
+                      <>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-slate-950 rounded-lg p-2 flex flex-col gap-0.5">
+                            <span className="text-[9px] font-mono text-slate-500 uppercase">Latency</span>
+                            <span className="text-xs font-mono text-white">{r.latencyMs}ms</span>
+                          </div>
+                          <div className="bg-slate-950 rounded-lg p-2 flex flex-col gap-0.5">
+                            <span className="text-[9px] font-mono text-slate-500 uppercase">Tokens</span>
+                            <span className="text-xs font-mono text-white">{r.tokens ?? "—"}</span>
+                          </div>
+                          <div className="bg-slate-950 rounded-lg p-2 flex flex-col gap-0.5">
+                            <span className="text-[9px] font-mono text-slate-500 uppercase">Cost</span>
+                            <span className="text-xs font-mono text-emerald-400">${r.cost?.toFixed(6) ?? "—"}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm font-mono text-slate-200 whitespace-pre-wrap leading-relaxed flex-1">{r.response}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-mono text-rose-400 leading-relaxed">{r.error ?? "Unknown error"}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <SettingsModal
         open={showSettings}
         onClose={() => setShowSettings(false)}
