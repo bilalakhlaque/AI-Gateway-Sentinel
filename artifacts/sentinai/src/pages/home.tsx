@@ -27,11 +27,42 @@ const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
   { type: "ssn", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
 ];
 
+const INJECTION_PATTERNS: Array<{ type: string; regex: RegExp }> = [
+  { type: "instruction_override", regex: /ignore\s+(all\s+)?(previous|prior|your|the|above|initial)\s+(instructions?|prompt|rules?|guidelines?|directives?|context)/i },
+  { type: "instruction_override", regex: /disregard\s+(all\s+)?(previous|prior|your|the|above|initial)\s+(instructions?|prompt|rules?|guidelines?|directives?|context)/i },
+  { type: "instruction_override", regex: /forget\s+(all|everything|what you've been told|your instructions?|your training|your previous|your prior)/i },
+  { type: "instruction_override", regex: /override\s+(your|the|all)\s+(instructions?|programming|directives?|rules?|guidelines?|constraints?)/i },
+  { type: "instruction_override", regex: /new\s+(instructions?|directives?|rules?|prompt)\s*:/i },
+  { type: "jailbreak", regex: /jailbreak/i },
+  { type: "jailbreak", regex: /do anything now/i },
+  { type: "jailbreak", regex: /developer\s*mode\s*(enabled|on|activated)/i },
+  { type: "jailbreak", regex: /bypass\s+(safety|filter|restriction|moderation|guardrail|alignment)/i },
+  { type: "role_hijack", regex: /you\s+are\s+now\s+(?!sentinai|an?\s+AI|a\s+language\s+model)/i },
+  { type: "role_hijack", regex: /act\s+as\s+(if\s+you\s+have\s+no|an?\s+unrestricted|an?\s+unfiltered|a\s+different\s+AI|a\s+rogue)/i },
+  { type: "role_hijack", regex: /pretend\s+(you\s+(are|have\s+no)\s+(restrictions?|limits?|rules?|guidelines?)|that\s+you\s+are\s+a\s+different)/i },
+  { type: "prompt_delimiter", regex: /\[SYSTEM\]|\[INST\]|<\|system\|>|<\|im_start\|>|###\s*(system|instruction|prompt)/i },
+  { type: "sql_injection", regex: /(['"]?\s*;\s*(DROP|DELETE|INSERT|UPDATE|TRUNCATE|ALTER|CREATE)\s+(TABLE|DATABASE|INDEX|VIEW))/i },
+  { type: "sql_injection", regex: /UNION\s+(ALL\s+)?SELECT/i },
+  { type: "sql_injection", regex: /(['"]?\s*(OR|AND)\s+['"]?1['"]?\s*=\s*['"]?1)/i },
+];
+
 function detectPiiClient(text: string) {
   const matches: Array<{ type: string; value: string }> = [];
   for (const { type, regex } of PII_PATTERNS) {
     const found = text.match(new RegExp(regex.source, regex.flags));
     if (found) found.forEach((value) => matches.push({ type, value }));
+  }
+  return matches;
+}
+
+function detectInjectionClient(text: string) {
+  const matches: Array<{ type: string; snippet: string }> = [];
+  for (const { type, regex } of INJECTION_PATTERNS) {
+    const match = text.match(regex);
+    if (match) {
+      const snippet = match[0].length > 50 ? match[0].slice(0, 47) + "..." : match[0];
+      matches.push({ type, snippet });
+    }
   }
   return matches;
 }
@@ -71,6 +102,7 @@ export default function Home() {
   const [pendingFallback, setPendingFallback] = useState<PendingFallback | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [piiWarning, setPiiWarning] = useState<Array<{ type: string; value: string }> | null>(null);
+  const [injectionWarning, setInjectionWarning] = useState<Array<{ type: string; snippet: string }> | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isLogFullscreen, setIsLogFullscreen] = useState(false);
@@ -84,6 +116,9 @@ export default function Home() {
 
   const sendRequest = (targetModel: ModelKey) => {
     if (!prompt.trim()) return;
+    const inj = detectInjectionClient(prompt);
+    if (inj.length > 0) { setInjectionWarning(inj); setPiiWarning(null); return; }
+    setInjectionWarning(null);
     const pii = detectPiiClient(prompt);
     if (pii.length > 0) { setPiiWarning(pii); return; }
     setPiiWarning(null);
@@ -112,6 +147,9 @@ export default function Home() {
 
   const handleCompare = () => {
     if (!prompt.trim()) return;
+    const inj = detectInjectionClient(prompt);
+    if (inj.length > 0) { setInjectionWarning(inj); setPiiWarning(null); return; }
+    setInjectionWarning(null);
     const pii = detectPiiClient(prompt);
     if (pii.length > 0) { setPiiWarning(pii); return; }
     setPiiWarning(null);
@@ -352,6 +390,33 @@ export default function Home() {
                   className="flex-1 min-h-[200px] bg-slate-950 border-slate-800 focus-visible:ring-cyan-500/50 font-mono text-sm resize-none"
                 />
               </div>
+
+              {/* Injection Warning */}
+              {injectionWarning && injectionWarning.length > 0 && (
+                <div className="rounded-lg border border-orange-500/40 bg-orange-950/20 p-3 flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-mono font-semibold text-orange-300">Injection Attempt Detected — prompt blocked</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {injectionWarning.map((m, i) => (
+                            <span key={i} className="text-[10px] font-mono bg-orange-900/40 text-orange-400 px-1.5 py-0.5 rounded border border-orange-800/50" title={m.snippet}>
+                              {m.type.replace(/_/g, " ").toUpperCase()}
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[10px] font-mono text-orange-500/80 mt-0.5 leading-relaxed">
+                          Matched: &ldquo;{injectionWarning[0]?.snippet}&rdquo;
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => setInjectionWarning(null)} className="text-slate-500 hover:text-slate-300 shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* PII Warning */}
               {piiWarning && piiWarning.length > 0 && (

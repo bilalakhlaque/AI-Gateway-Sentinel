@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { callModel, type ModelName, type ModelKeys } from "../lib/llmGateway";
 import { detectPii } from "../lib/piiDetector";
+import { detectPromptInjection } from "../lib/promptInjectionDetector";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -31,10 +32,13 @@ router.post("/compare", async (req, res): Promise<void> => {
 
   const piiMatches = detectPii(prompt);
   if (piiMatches.length > 0) {
-    res.status(400).json({
-      error: "PII detected in prompt",
-      piiMatches,
-    });
+    res.status(400).json({ error: "PII detected in prompt", blocked: true, reason: "pii", piiMatches });
+    return;
+  }
+
+  const injectionMatches = detectPromptInjection(prompt);
+  if (injectionMatches.length > 0) {
+    res.status(400).json({ error: "Prompt injection detected", blocked: true, reason: "injection", injectionMatches });
     return;
   }
 

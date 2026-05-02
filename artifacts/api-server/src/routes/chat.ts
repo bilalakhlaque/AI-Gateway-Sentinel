@@ -3,6 +3,7 @@ import { isRateLimited } from "../lib/rateLimiter";
 import { callModel, FALLBACK_NEXT, type ModelName, type ModelKeys } from "../lib/llmGateway";
 import { recordRequest } from "../lib/statsStore";
 import { detectPii } from "../lib/piiDetector";
+import { detectPromptInjection } from "../lib/promptInjectionDetector";
 import { ChatBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -22,7 +23,30 @@ router.post("/chat", async (req, res): Promise<void> => {
   if (piiMatches.length > 0) {
     res.status(400).json({
       error: "PII detected in prompt",
+      blocked: true,
+      reason: "pii",
       piiMatches,
+    });
+    return;
+  }
+
+  const injectionMatches = detectPromptInjection(prompt);
+  if (injectionMatches.length > 0) {
+    recordRequest({
+      model: model as ModelName,
+      modelUsed: model as ModelName,
+      tokens: 0,
+      cost: 0,
+      latencyMs: 0,
+      status: "blocked",
+      promptSnippet: prompt.slice(0, 80),
+      errorMessage: `Prompt injection blocked: ${injectionMatches.map((m) => m.type).join(", ")}`,
+    });
+    res.status(400).json({
+      error: "Prompt injection detected",
+      blocked: true,
+      reason: "injection",
+      injectionMatches,
     });
     return;
   }
