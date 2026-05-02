@@ -86,6 +86,33 @@ interface PendingFallback {
   errorMessage: string;
 }
 
+const PROMPT_TEMPLATES: Array<{ label: string; prompt: string }> = [
+  {
+    label: "Summarize this",
+    prompt: "Please summarize the following text in 3-5 concise bullet points, highlighting the key takeaways:\n\n[paste your text here]",
+  },
+  {
+    label: "Debug this code",
+    prompt: "I have a bug in the following code. Please identify the issue, explain why it's happening, and provide a corrected version:\n\n```\n[paste your code here]\n```",
+  },
+  {
+    label: "Write a cover letter",
+    prompt: "Write a professional cover letter for the following job description. Keep it under 300 words, enthusiastic but not over-the-top, and tailored to the role:\n\nJob title: [title]\nCompany: [company]\nKey requirements: [paste job description]",
+  },
+  {
+    label: "Explain like I'm 5",
+    prompt: "Explain the following concept in simple terms that a curious 10-year-old could understand. Use an analogy or real-world example:\n\nConcept: [topic]",
+  },
+  {
+    label: "Compare pros & cons",
+    prompt: "Give me a balanced pros and cons analysis of the following topic. Use a structured format with clear headers:\n\nTopic: [topic]",
+  },
+  {
+    label: "Write unit tests",
+    prompt: "Write comprehensive unit tests for the following function. Cover happy paths, edge cases, and error conditions. Use a standard testing framework appropriate to the language:\n\n```\n[paste your function here]\n```",
+  },
+];
+
 const MODEL_LABELS: Record<ModelKey, string> = {
   openai: "OpenAI GPT-5.4",
   gemini: "Gemini 3.1 Pro",
@@ -522,7 +549,37 @@ export default function Home() {
               )}
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Input Prompt</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Input Prompt</label>
+                  <Select
+                    value=""
+                    onValueChange={(val) => {
+                      const tpl = PROMPT_TEMPLATES.find((t) => t.label === val);
+                      if (tpl) setPrompt(tpl.prompt);
+                    }}
+                  >
+                    <SelectTrigger className="h-6 w-auto gap-1.5 border-slate-700 bg-slate-950/80 px-2 text-[10px] font-mono text-slate-400 hover:text-cyan-400 hover:border-cyan-700 focus:ring-cyan-500/30 transition-colors [&>svg]:hidden">
+                      <span className="flex items-center gap-1">
+                        <Database className="w-2.5 h-2.5" />
+                        Templates
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700 min-w-[200px]">
+                      <div className="px-2 py-1.5 text-[9px] font-mono text-slate-500 uppercase tracking-wider border-b border-slate-800 mb-1">
+                        Select a template
+                      </div>
+                      {PROMPT_TEMPLATES.map((tpl) => (
+                        <SelectItem
+                          key={tpl.label}
+                          value={tpl.label}
+                          className="font-mono text-xs focus:bg-slate-800 focus:text-cyan-300 cursor-pointer"
+                        >
+                          {tpl.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Textarea 
                   ref={textareaRef}
                   value={prompt}
