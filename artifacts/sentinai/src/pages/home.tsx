@@ -932,7 +932,7 @@ export default function Home() {
                       formatter={(value) => <span style={{ color: MODEL_COLORS[value] ?? '#94a3b8' }}>{MODEL_LABELS[value as ModelKey] ?? value}</span>}
                     />
                     {(["openai", "gemini", "claude", "claude-opus"] as ModelKey[]).map(m => (
-                      <Line key={m} type="monotone" dataKey={m} name={m} stroke={MODEL_COLORS[m]} strokeWidth={2} dot={{ r: 3, fill: MODEL_COLORS[m] }} connectNulls={false} activeDot={{ r: 5 }} />
+                      <Line key={m} type="monotone" dataKey={m} name={m} stroke={MODEL_COLORS[m]} strokeWidth={2} dot={{ r: 3, fill: MODEL_COLORS[m] }} connectNulls activeDot={{ r: 5 }} />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
