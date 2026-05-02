@@ -7,10 +7,8 @@
  */
 import { z as zod } from "zod";
 
-export const ChatRequest = zod.object({
+export const CompareRequest = zod.object({
   prompt: zod.string(),
-  model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
-  apiKey: zod.string().nullish(),
   modelKeys: zod
     .object({
       openai: zod.string().optional(),
@@ -20,4 +18,4 @@ export const ChatRequest = zod.object({
     .optional(),
 });
 
-export type ChatRequest = zod.input<typeof ChatRequest>;
+export type CompareRequest = zod.input<typeof CompareRequest>;

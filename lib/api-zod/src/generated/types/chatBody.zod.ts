@@ -11,6 +11,13 @@ export const ChatBody = zod.object({
   prompt: zod.string(),
   model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
+  modelKeys: zod
+    .object({
+      openai: zod.string().optional(),
+      gemini: zod.string().optional(),
+      anthropic: zod.string().optional(),
+    })
+    .optional(),
 });
 
 export type ChatBody = zod.input<typeof ChatBody>;

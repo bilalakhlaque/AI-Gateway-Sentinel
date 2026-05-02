@@ -23,6 +23,13 @@ export const ChatBody = zod.object({
   prompt: zod.string(),
   model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
+  modelKeys: zod
+    .object({
+      openai: zod.string().optional(),
+      gemini: zod.string().optional(),
+      anthropic: zod.string().optional(),
+    })
+    .optional(),
 });
 
 export const ChatResponse = zod.object({
@@ -35,6 +42,58 @@ export const ChatResponse = zod.object({
   latencyMs: zod.number(),
   status: zod.enum(["success", "fallback", "blocked", "error"]),
   errorMessage: zod.string().nullish(),
+});
+
+/**
+ * Runs the prompt against all four models in parallel and returns results side-by-side
+ * @summary Send the same prompt to all models simultaneously
+ */
+export const CompareBody = zod.object({
+  prompt: zod.string(),
+  modelKeys: zod
+    .object({
+      openai: zod.string().optional(),
+      gemini: zod.string().optional(),
+      anthropic: zod.string().optional(),
+    })
+    .optional(),
+});
+
+export const CompareResponse = zod.object({
+  results: zod.object({
+    openai: zod.object({
+      response: zod.string().nullish(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      latencyMs: zod.number(),
+      status: zod.enum(["success", "error"]),
+      error: zod.string().nullish(),
+    }),
+    gemini: zod.object({
+      response: zod.string().nullish(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      latencyMs: zod.number(),
+      status: zod.enum(["success", "error"]),
+      error: zod.string().nullish(),
+    }),
+    claude: zod.object({
+      response: zod.string().nullish(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      latencyMs: zod.number(),
+      status: zod.enum(["success", "error"]),
+      error: zod.string().nullish(),
+    }),
+    "claude-opus": zod.object({
+      response: zod.string().nullish(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      latencyMs: zod.number(),
+      status: zod.enum(["success", "error"]),
+      error: zod.string().nullish(),
+    }),
+  }),
 });
 
 /**

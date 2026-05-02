@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { 
-  useChat, 
+  useChat,
+  useCompare,
   useGetStats, 
   useGetLogs, 
   getGetStatsQueryKey, 
@@ -15,8 +16,25 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2 } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal } from "lucide-react";
 import { format } from "date-fns";
+import SettingsModal from "@/components/SettingsModal";
+import { useApiKeys } from "@/hooks/useApiKeys";
+
+const PII_PATTERNS: Array<{ type: string; regex: RegExp }> = [
+  { type: "email", regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+  { type: "phone", regex: /\b(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g },
+  { type: "ssn", regex: /\b\d{3}-\d{2}-\d{4}\b/g },
+];
+
+function detectPiiClient(text: string) {
+  const matches: Array<{ type: string; value: string }> = [];
+  for (const { type, regex } of PII_PATTERNS) {
+    const found = text.match(new RegExp(regex.source, regex.flags));
+    if (found) found.forEach((value) => matches.push({ type, value }));
+  }
+  return matches;
+}
 
 const MODEL_OPTIONS = [
   { value: "openai", label: "OpenAI GPT-5.4" },
@@ -40,13 +58,20 @@ const MODEL_LABELS: Record<ModelKey, string> = {
   "claude-opus": "Claude Opus 4.7",
 };
 
+type Mode = "single" | "compare";
+
 export default function Home() {
   const queryClient = useQueryClient();
+  const { keys, updateKey, getModelKeys, hasAnyKey } = useApiKeys();
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<ModelKey>("openai");
+  const [mode, setMode] = useState<Mode>("single");
   const [lastResponse, setLastResponse] = useState<any>(null);
+  const [compareResults, setCompareResults] = useState<any>(null);
   const [pendingFallback, setPendingFallback] = useState<PendingFallback | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [piiWarning, setPiiWarning] = useState<Array<{ type: string; value: string }> | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isLogFullscreen, setIsLogFullscreen] = useState(false);
   const [isResponseFullscreen, setIsResponseFullscreen] = useState(false);
@@ -55,13 +80,17 @@ export default function Home() {
   const { data: logsData } = useGetLogs({ query: { refetchInterval: 5000, queryKey: getGetLogsQueryKey() } });
 
   const chatMutation = useChat();
+  const compareMutation = useCompare();
 
   const sendRequest = (targetModel: ModelKey) => {
     if (!prompt.trim()) return;
+    const pii = detectPiiClient(prompt);
+    if (pii.length > 0) { setPiiWarning(pii); return; }
+    setPiiWarning(null);
     setPendingFallback(null);
     setLastError(null);
 
-    chatMutation.mutate({ data: { prompt, model: targetModel } }, {
+    chatMutation.mutate({ data: { prompt, model: targetModel, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setLastResponse(data);
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
@@ -72,13 +101,8 @@ export default function Home() {
         const errData = err?.data as { error?: string; suggestedFallback?: string | null } | undefined;
         const errorMsg = errData?.error ?? "Request failed";
         const suggested = errData?.suggestedFallback as ModelKey | null | undefined;
-
         if (suggested) {
-          setPendingFallback({
-            suggestedModel: suggested,
-            failedModel: targetModel,
-            errorMessage: errorMsg,
-          });
+          setPendingFallback({ suggestedModel: suggested, failedModel: targetModel, errorMessage: errorMsg });
         } else {
           setLastError(errorMsg);
         }
@@ -86,7 +110,26 @@ export default function Home() {
     });
   };
 
-  const handleSend = () => sendRequest(model);
+  const handleCompare = () => {
+    if (!prompt.trim()) return;
+    const pii = detectPiiClient(prompt);
+    if (pii.length > 0) { setPiiWarning(pii); return; }
+    setPiiWarning(null);
+    setCompareResults(null);
+    compareMutation.mutate({ data: { prompt, modelKeys: getModelKeys() as any } }, {
+      onSuccess: (data) => {
+        setCompareResults(data.results);
+        queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
+      },
+      onError: (err: any) => {
+        const msg = (err?.data as any)?.error ?? "Compare failed";
+        setLastError(msg);
+      }
+    });
+  };
+
+  const handleSend = () => mode === "compare" ? handleCompare() : sendRequest(model);
 
   const handleConfirmFallback = () => {
     if (!pendingFallback) return;
@@ -232,11 +275,20 @@ export default function Home() {
             <p className="text-xs text-slate-400 font-mono mt-0.5">MULTI-MODEL GATEWAY</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-sm font-mono text-slate-400">
+        <div className="flex items-center gap-3 text-sm font-mono text-slate-400">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
             SYSTEM OPERATIONAL
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 w-8 p-0 hover:bg-slate-800 hover:text-cyan-400 transition-colors ${hasAnyKey ? "text-cyan-400" : "text-slate-500"}`}
+            onClick={() => setShowSettings(true)}
+            title="API Key Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
         </div>
       </header>
 
@@ -244,28 +296,52 @@ export default function Home() {
         {/* Left Column: Chat */}
         <div className="xl:col-span-4 flex flex-col gap-6">
           <Card className="bg-slate-900/50 border-slate-800 shadow-xl shadow-black/40 flex-1 flex flex-col">
-            <CardHeader className="border-b border-slate-800/50 pb-4">
-              <CardTitle className="text-base font-medium flex items-center gap-2">
-                <Zap className="w-4 h-4 text-cyan-400" />
-                Prompt Console
+            <CardHeader className="border-b border-slate-800/50 pb-3">
+              <CardTitle className="text-base font-medium flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                  Prompt Console
+                </div>
+                <div className="flex items-center bg-slate-950 rounded-lg border border-slate-800 p-0.5">
+                  <button
+                    onClick={() => setMode("single")}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${mode === "single" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+                  >
+                    <Layers className="w-3 h-3" /> Single
+                  </button>
+                  <button
+                    onClick={() => setMode("compare")}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${mode === "compare" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-slate-200"}`}
+                  >
+                    <SplitSquareHorizontal className="w-3 h-3" /> Compare
+                  </button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 flex-1 flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Target Model</label>
-                <Select value={model} onValueChange={(val: any) => setModel(val)}>
-                  <SelectTrigger className="bg-slate-950 border-slate-800 focus:ring-cyan-500/50 font-mono text-sm">
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-800">
-                    {MODEL_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-sm focus:bg-slate-800 focus:text-white">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {mode === "single" && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Target Model</label>
+                  <Select value={model} onValueChange={(val: any) => setModel(val)}>
+                    <SelectTrigger className="bg-slate-950 border-slate-800 focus:ring-cyan-500/50 font-mono text-sm">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-800">
+                      {MODEL_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value} className="font-mono text-sm focus:bg-slate-800 focus:text-white">
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {mode === "compare" && (
+                <div className="flex items-center gap-2 rounded-lg border border-cyan-900/40 bg-cyan-950/10 px-3 py-2">
+                  <SplitSquareHorizontal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="text-[11px] font-mono text-cyan-400">Prompt will be sent to all 4 models simultaneously</span>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2 flex-1">
                 <label className="text-xs font-mono text-slate-400 uppercase tracking-wider">Input Prompt</label>
@@ -277,13 +353,39 @@ export default function Home() {
                 />
               </div>
 
+              {/* PII Warning */}
+              {piiWarning && piiWarning.length > 0 && (
+                <div className="rounded-lg border border-rose-500/40 bg-rose-950/20 p-3 flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-mono font-semibold text-rose-300">PII Detected — prompt blocked</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {piiWarning.map((m, i) => (
+                            <span key={i} className="text-[10px] font-mono bg-rose-900/40 text-rose-400 px-1.5 py-0.5 rounded border border-rose-800/50">
+                              {m.type.toUpperCase()}: {m.value.length > 20 ? m.value.slice(0, 17) + "..." : m.value}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => setPiiWarning(null)} className="text-slate-500 hover:text-slate-300 shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <Button 
                 onClick={handleSend} 
-                disabled={chatMutation.isPending || !prompt.trim() || !!pendingFallback}
+                disabled={(mode === "single" ? chatMutation.isPending : compareMutation.isPending) || !prompt.trim() || !!pendingFallback}
                 className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium shadow-[0_0_15px_rgba(8,145,178,0.3)] hover:shadow-[0_0_20px_rgba(8,145,178,0.5)] transition-all"
               >
-                {chatMutation.isPending ? (
+                {(mode === "single" ? chatMutation.isPending : compareMutation.isPending) ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> EXECUTING...</>
+                ) : mode === "compare" ? (
+                  <><SplitSquareHorizontal className="w-4 h-4 mr-2" /> COMPARE ALL MODELS</>
                 ) : (
                   <>SEND REQUEST</>
                 )}
@@ -362,7 +464,8 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {/* Response Area */}
+          {/* Response Area — single mode */}
+          {mode === "single" && (
           <Card className="bg-slate-900/50 border-slate-800 shadow-xl shadow-black/40 min-h-[250px] flex flex-col">
             <CardHeader className="border-b border-slate-800/50 pb-4">
               <CardTitle className="text-base font-medium flex items-center justify-between">
@@ -431,6 +534,74 @@ export default function Home() {
               </Button>
             </div>
           </Card>
+          )}
+
+          {/* Compare Results — compare mode */}
+          {mode === "compare" && (
+            <Card className="bg-slate-900/50 border-slate-800 shadow-xl shadow-black/40 flex flex-col">
+              <CardHeader className="border-b border-slate-800/50 pb-3">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <SplitSquareHorizontal className="w-4 h-4 text-cyan-400" />
+                  Model Comparison
+                  {compareResults && (
+                    <span className="text-[10px] font-mono text-slate-500 ml-auto">{compareResults.length} models</span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                {compareMutation.isPending ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-10">
+                    <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+                    <span className="text-xs font-mono text-slate-400">Querying all models in parallel…</span>
+                  </div>
+                ) : !compareResults ? (
+                  <div className="flex items-center justify-center text-slate-500 font-mono text-sm py-10">
+                    AWAITING COMPARE…
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {compareResults.map((r: any) => {
+                      const label = MODEL_LABELS[r.model as ModelKey] ?? r.model;
+                      const isOk = r.status === "fulfilled";
+                      return (
+                        <div key={r.model} className={`rounded-lg border p-3 flex flex-col gap-2 ${isOk ? "border-slate-700 bg-slate-950/60" : "border-rose-900/40 bg-rose-950/10"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-mono font-semibold text-slate-200 truncate">{label}</span>
+                            <Badge className={`text-[10px] shrink-0 ${isOk ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border-rose-500/30"}`}>
+                              {isOk ? "OK" : "FAILED"}
+                            </Badge>
+                          </div>
+                          {isOk ? (
+                            <>
+                              <div className="grid grid-cols-3 gap-1">
+                                <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
+                                  <span className="text-[9px] font-mono text-slate-500">LATENCY</span>
+                                  <span className="text-[11px] font-mono text-white">{r.latencyMs}ms</span>
+                                </div>
+                                <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
+                                  <span className="text-[9px] font-mono text-slate-500">TOKENS</span>
+                                  <span className="text-[11px] font-mono text-white">{r.tokens ?? "—"}</span>
+                                </div>
+                                <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
+                                  <span className="text-[9px] font-mono text-slate-500">COST</span>
+                                  <span className="text-[11px] font-mono text-emerald-400">${r.cost?.toFixed(5) ?? "—"}</span>
+                                </div>
+                              </div>
+                              <ScrollArea className="h-[120px]">
+                                <p className="text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed">{r.response}</p>
+                              </ScrollArea>
+                            </>
+                          ) : (
+                            <p className="text-[11px] font-mono text-rose-400 leading-relaxed">{r.error ?? "Unknown error"}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Stats & Logs */}
@@ -630,6 +801,12 @@ export default function Home() {
           </div>
         </div>
       )}
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        keys={keys}
+        onUpdate={updateKey}
+      />
     </div>
   );
 }

@@ -20,8 +20,11 @@ import type {
   ChatFailedResponse,
   ChatRequest,
   ChatResponse,
+  CompareRequest,
+  CompareResponse,
   HealthStatus,
   LogsResponse,
+  PiiBlockedResponse,
   StatsResponse,
 } from "./api.schemas";
 
@@ -193,6 +196,93 @@ export const useChat = <
   TContext
 > => {
   return useMutation(getChatMutationOptions(options));
+};
+
+/**
+ * Runs the prompt against all four models in parallel and returns results side-by-side
+ * @summary Send the same prompt to all models simultaneously
+ */
+export const getCompareUrl = () => {
+  return `/api/compare`;
+};
+
+export const compare = async (
+  compareRequest: CompareRequest,
+  options?: RequestInit,
+): Promise<CompareResponse> => {
+  return customFetch<CompareResponse>(getCompareUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(compareRequest),
+  });
+};
+
+export const getCompareMutationOptions = <
+  TError = ErrorType<PiiBlockedResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compare>>,
+    TError,
+    { data: BodyType<CompareRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof compare>>,
+  TError,
+  { data: BodyType<CompareRequest> },
+  TContext
+> => {
+  const mutationKey = ["compare"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof compare>>,
+    { data: BodyType<CompareRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return compare(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CompareMutationResult = NonNullable<
+  Awaited<ReturnType<typeof compare>>
+>;
+export type CompareMutationBody = BodyType<CompareRequest>;
+export type CompareMutationError = ErrorType<PiiBlockedResponse>;
+
+/**
+ * @summary Send the same prompt to all models simultaneously
+ */
+export const useCompare = <
+  TError = ErrorType<PiiBlockedResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof compare>>,
+    TError,
+    { data: BodyType<CompareRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof compare>>,
+  TError,
+  { data: BodyType<CompareRequest> },
+  TContext
+> => {
+  return useMutation(getCompareMutationOptions(options));
 };
 
 /**

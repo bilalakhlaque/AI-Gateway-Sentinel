@@ -61,6 +61,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ChatFailedResponse"
 
+  /compare:
+    post:
+      operationId: compare
+      tags: [chat]
+      summary: Send the same prompt to all models simultaneously
+      description: Runs the prompt against all four models in parallel and returns results side-by-side
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareRequest"
+      responses:
+        "200":
+          description: Results from all models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompareResponse"
+        "400":
+          description: PII detected in prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PiiBlockedResponse"
+
   /stats:
     get:
       operationId: getStats
@@ -99,6 +125,95 @@ components:
       required:
         - status
 
+    ModelKeys:
+      type: object
+      properties:
+        openai:
+          type: string
+        gemini:
+          type: string
+        anthropic:
+          type: string
+
+    PiiMatch:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [email, phone, ssn]
+        value:
+          type: string
+      required:
+        - type
+        - value
+
+    PiiBlockedResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        piiMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/PiiMatch"
+      required:
+        - error
+        - piiMatches
+
+    CompareRequest:
+      type: object
+      properties:
+        prompt:
+          type: string
+        modelKeys:
+          $ref: "#/components/schemas/ModelKeys"
+      required:
+        - prompt
+
+    CompareModelResult:
+      type: object
+      properties:
+        response:
+          type: ["string", "null"]
+        tokens:
+          type: integer
+        cost:
+          type: number
+        latencyMs:
+          type: integer
+        status:
+          type: string
+          enum: [success, error]
+        error:
+          type: ["string", "null"]
+      required:
+        - tokens
+        - cost
+        - latencyMs
+        - status
+
+    CompareResponse:
+      type: object
+      properties:
+        results:
+          type: object
+          properties:
+            openai:
+              $ref: "#/components/schemas/CompareModelResult"
+            gemini:
+              $ref: "#/components/schemas/CompareModelResult"
+            claude:
+              $ref: "#/components/schemas/CompareModelResult"
+            claude-opus:
+              $ref: "#/components/schemas/CompareModelResult"
+          required:
+            - openai
+            - gemini
+            - claude
+            - claude-opus
+      required:
+        - results
+
     ChatRequest:
       type: object
       properties:
@@ -109,6 +224,8 @@ components:
           enum: [openai, gemini, claude, claude-opus]
         apiKey:
           type: ["string", "null"]
+        modelKeys:
+          $ref: "#/components/schemas/ModelKeys"
       required:
         - prompt
         - model

@@ -16,6 +16,12 @@ const COST_PER_TOKEN: Record<ModelName, number> = {
   "claude-opus": 0.000075,
 };
 
+export interface ModelKeys {
+  openai?: string;
+  gemini?: string;
+  anthropic?: string;
+}
+
 export interface LLMResult {
   response: string;
   modelUsed: ModelName;
@@ -24,15 +30,18 @@ export interface LLMResult {
   latencyMs: number;
 }
 
-async function callOpenAI(prompt: string): Promise<{ text: string; tokens: number }> {
-  const apiKey = process.env["OPENAI_API_KEY"];
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+async function callOpenAI(
+  prompt: string,
+  apiKey?: string,
+): Promise<{ text: string; tokens: number }> {
+  const key = apiKey || process.env["OPENAI_API_KEY"];
+  if (!key) throw new Error("OPENAI_API_KEY not set");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
       model: "gpt-4o",
@@ -57,12 +66,15 @@ async function callOpenAI(prompt: string): Promise<{ text: string; tokens: numbe
   };
 }
 
-async function callGemini(prompt: string): Promise<{ text: string; tokens: number }> {
-  const apiKey = process.env["GEMINI_API_KEY"];
-  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+async function callGemini(
+  prompt: string,
+  apiKey?: string,
+): Promise<{ text: string; tokens: number }> {
+  const key = apiKey || process.env["GEMINI_API_KEY"];
+  if (!key) throw new Error("GEMINI_API_KEY not set");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,19 +95,23 @@ async function callGemini(prompt: string): Promise<{ text: string; tokens: numbe
   };
 
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const tokens = data.usageMetadata?.totalTokenCount ?? Math.ceil(prompt.length / 4);
+  const tokens =
+    data.usageMetadata?.totalTokenCount ?? Math.ceil(prompt.length / 4);
   return { text, tokens };
 }
 
-async function callClaude(prompt: string): Promise<{ text: string; tokens: number }> {
-  const apiKey = process.env["ANTHROPIC_API_KEY"];
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+async function callClaude(
+  prompt: string,
+  apiKey?: string,
+): Promise<{ text: string; tokens: number }> {
+  const key = apiKey || process.env["ANTHROPIC_API_KEY"];
+  if (!key) throw new Error("ANTHROPIC_API_KEY not set");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
+      "x-api-key": key,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -116,19 +132,23 @@ async function callClaude(prompt: string): Promise<{ text: string; tokens: numbe
   };
 
   const text = data.content?.[0]?.text ?? "";
-  const tokens = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
+  const tokens =
+    (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
   return { text, tokens };
 }
 
-async function callClaudeOpus(prompt: string): Promise<{ text: string; tokens: number }> {
-  const apiKey = process.env["ANTHROPIC_API_KEY"];
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+async function callClaudeOpus(
+  prompt: string,
+  apiKey?: string,
+): Promise<{ text: string; tokens: number }> {
+  const key = apiKey || process.env["ANTHROPIC_API_KEY"];
+  if (!key) throw new Error("ANTHROPIC_API_KEY not set");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
+      "x-api-key": key,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -149,25 +169,42 @@ async function callClaudeOpus(prompt: string): Promise<{ text: string; tokens: n
   };
 
   const text = data.content?.[0]?.text ?? "";
-  const tokens = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
+  const tokens =
+    (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
   return { text, tokens };
 }
 
-const callers: Record<ModelName, (prompt: string) => Promise<{ text: string; tokens: number }>> = {
+const callers: Record<
+  ModelName,
+  (
+    prompt: string,
+    apiKey?: string,
+  ) => Promise<{ text: string; tokens: number }>
+> = {
   openai: callOpenAI,
   gemini: callGemini,
   claude: callClaude,
   "claude-opus": callClaudeOpus,
 };
 
-/**
- * Calls a single model — no automatic fallback.
- * Throws on failure so the caller can decide what to do next.
- */
-export async function callModel(model: ModelName, prompt: string): Promise<LLMResult> {
+function resolveKey(model: ModelName, keys?: ModelKeys): string | undefined {
+  if (!keys) return undefined;
+  if (model === "openai") return keys.openai || undefined;
+  if (model === "gemini") return keys.gemini || undefined;
+  if (model === "claude" || model === "claude-opus")
+    return keys.anthropic || undefined;
+  return undefined;
+}
+
+export async function callModel(
+  model: ModelName,
+  prompt: string,
+  modelKeys?: ModelKeys,
+): Promise<LLMResult> {
   const start = Date.now();
   try {
-    const result = await callers[model](prompt);
+    const key = resolveKey(model, modelKeys);
+    const result = await callers[model](prompt, key);
     const latencyMs = Date.now() - start;
     const cost = result.tokens * COST_PER_TOKEN[model];
     return {

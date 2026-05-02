@@ -9,6 +9,65 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface ModelKeys {
+  openai?: string;
+  gemini?: string;
+  anthropic?: string;
+}
+
+export type PiiMatchType = (typeof PiiMatchType)[keyof typeof PiiMatchType];
+
+export const PiiMatchType = {
+  email: "email",
+  phone: "phone",
+  ssn: "ssn",
+} as const;
+
+export interface PiiMatch {
+  type: PiiMatchType;
+  value: string;
+}
+
+export interface PiiBlockedResponse {
+  error: string;
+  piiMatches: PiiMatch[];
+}
+
+export interface CompareRequest {
+  prompt: string;
+  modelKeys?: ModelKeys;
+}
+
+export type CompareModelResultStatus =
+  (typeof CompareModelResultStatus)[keyof typeof CompareModelResultStatus];
+
+export const CompareModelResultStatus = {
+  success: "success",
+  error: "error",
+} as const;
+
+export interface CompareModelResult {
+  /** @nullable */
+  response?: string | null;
+  tokens: number;
+  cost: number;
+  latencyMs: number;
+  status: CompareModelResultStatus;
+  /** @nullable */
+  error?: string | null;
+}
+
+export type CompareResponseResults = {
+  openai: CompareModelResult;
+  gemini: CompareModelResult;
+  claude: CompareModelResult;
+  "claude-opus": CompareModelResult;
+};
+
+export interface CompareResponse {
+  results: CompareResponseResults;
+}
+
 export type ChatRequestModel =
   (typeof ChatRequestModel)[keyof typeof ChatRequestModel];
 
@@ -24,6 +83,7 @@ export interface ChatRequest {
   model: ChatRequestModel;
   /** @nullable */
   apiKey?: string | null;
+  modelKeys?: ModelKeys;
 }
 
 export type ChatResponseStatus =

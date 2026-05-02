@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { isRateLimited } from "../lib/rateLimiter";
-import { callModel, FALLBACK_NEXT, type ModelName } from "../lib/llmGateway";
+import { callModel, FALLBACK_NEXT, type ModelName, type ModelKeys } from "../lib/llmGateway";
 import { recordRequest } from "../lib/statsStore";
+import { detectPii } from "../lib/piiDetector";
 import { ChatBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -14,7 +15,17 @@ router.post("/chat", async (req, res): Promise<void> => {
   }
 
   const { prompt, model } = parsed.data;
+  const modelKeys = (parsed.data as any).modelKeys as ModelKeys | undefined;
   const rateLimitKey = parsed.data.apiKey ?? model;
+
+  const piiMatches = detectPii(prompt);
+  if (piiMatches.length > 0) {
+    res.status(400).json({
+      error: "PII detected in prompt",
+      piiMatches,
+    });
+    return;
+  }
 
   if (isRateLimited(rateLimitKey)) {
     recordRequest({
@@ -35,7 +46,7 @@ router.post("/chat", async (req, res): Promise<void> => {
   }
 
   try {
-    const result = await callModel(model as ModelName, prompt);
+    const result = await callModel(model as ModelName, prompt, modelKeys);
 
     recordRequest({
       model: model as ModelName,
