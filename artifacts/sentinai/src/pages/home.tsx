@@ -108,6 +108,7 @@ export default function Home() {
   const [isLogFullscreen, setIsLogFullscreen] = useState(false);
   const [isResponseFullscreen, setIsResponseFullscreen] = useState(false);
   const [isCompareFullscreen, setIsCompareFullscreen] = useState(false);
+  const [lastComparePrompt, setLastComparePrompt] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: stats } = useGetStats({ query: { refetchInterval: 5000, queryKey: getGetStatsQueryKey() } });
@@ -156,6 +157,7 @@ export default function Home() {
     if (pii.length > 0) { setPiiWarning(pii); return; }
     setPiiWarning(null);
     setCompareResults(null);
+    setLastComparePrompt(prompt);
     compareMutation.mutate({ data: { prompt, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
         setCompareResults(
@@ -194,19 +196,44 @@ export default function Home() {
 
   const exportCsv = () => {
     const logs = logsData?.logs ?? [];
-    if (logs.length === 0) return;
-    const header = ["timestamp", "model", "model_used", "status", "tokens", "latency_ms", "cost_usd", "prompt_snippet"].join(",");
-    const rows = logs.map((l: any) => [
-      `"${l.timestamp}"`,
-      `"${l.model}"`,
-      `"${l.modelUsed}"`,
-      `"${l.status}"`,
-      l.tokens ?? 0,
-      l.latencyMs ?? 0,
-      (l.cost ?? 0).toFixed(8),
-      `"${(l.promptSnippet ?? "").replace(/"/g, '""')}"`,
-    ].join(","));
-    const csv = [header, ...rows].join("\n");
+    const hasCompare = compareResults && compareResults.length > 0;
+    if (logs.length === 0 && !hasCompare) return;
+
+    const sections: string[] = [];
+
+    if (logs.length > 0) {
+      const header = ["section", "timestamp", "model", "model_used", "status", "tokens", "latency_ms", "cost_usd", "prompt_snippet"].join(",");
+      const rows = logs.map((l: any) => [
+        `"traffic_log"`,
+        `"${l.timestamp}"`,
+        `"${l.model}"`,
+        `"${l.modelUsed}"`,
+        `"${l.status}"`,
+        l.tokens ?? 0,
+        l.latencyMs ?? 0,
+        (l.cost ?? 0).toFixed(8),
+        `"${(l.promptSnippet ?? "").replace(/"/g, '""')}"`,
+      ].join(","));
+      sections.push([header, ...rows].join("\n"));
+    }
+
+    if (hasCompare) {
+      const compareHeader = ["section", "prompt_snippet", "model", "status", "latency_ms", "tokens", "cost_usd", "response_snippet"].join(",");
+      const promptSnippet = lastComparePrompt.slice(0, 120).replace(/"/g, '""');
+      const compareRows = compareResults.map((r: any) => [
+        `"compare_run"`,
+        `"${promptSnippet}"`,
+        `"${r.model}"`,
+        `"${r.status}"`,
+        r.latencyMs ?? 0,
+        r.tokens ?? 0,
+        (r.cost ?? 0).toFixed(8),
+        `"${((r.response ?? r.error ?? "").slice(0, 200)).replace(/"/g, '""')}"`,
+      ].join(","));
+      sections.push([compareHeader, ...compareRows].join("\n"));
+    }
+
+    const csv = sections.join("\n\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -908,7 +935,7 @@ export default function Home() {
                     size="sm"
                     className="h-6 px-2 text-[10px] font-mono text-slate-400 hover:text-cyan-400 hover:bg-slate-800 gap-1.5 border border-slate-700"
                     onClick={exportCsv}
-                    disabled={!logsData?.logs?.length}
+                    disabled={!logsData?.logs?.length && !(compareResults && compareResults.length > 0)}
                     title="Download CSV report"
                   >
                     <Download className="w-3 h-3" />
