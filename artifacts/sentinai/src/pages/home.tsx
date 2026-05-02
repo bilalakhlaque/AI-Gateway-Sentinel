@@ -156,7 +156,9 @@ export default function Home() {
     setCompareResults(null);
     compareMutation.mutate({ data: { prompt, modelKeys: getModelKeys() as any } }, {
       onSuccess: (data) => {
-        setCompareResults(data.results);
+        setCompareResults(
+          Object.entries(data.results as Record<string, any>).map(([model, r]) => ({ model, ...(r as any) }))
+        );
         queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetLogsQueryKey() });
       },
@@ -675,7 +677,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {compareResults.map((r: any) => {
                       const label = MODEL_LABELS[r.model as ModelKey] ?? r.model;
-                      const isOk = r.status === "fulfilled";
+                      const isOk = r.status === "success";
                       return (
                         <div key={r.model} className={`rounded-lg border p-3 flex flex-col gap-2 ${isOk ? "border-slate-700 bg-slate-950/60" : "border-rose-900/40 bg-rose-950/10"}`}>
                           <div className="flex items-center justify-between gap-2">
