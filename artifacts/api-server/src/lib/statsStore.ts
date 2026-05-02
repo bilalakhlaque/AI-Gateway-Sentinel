@@ -1,4 +1,4 @@
-export type ModelName = "openai" | "gemini" | "claude";
+export type ModelName = "openai" | "gemini" | "claude" | "claude-opus";
 
 export type RequestStatus = "success" | "fallback" | "blocked" | "error";
 
@@ -26,6 +26,7 @@ const modelStats: Record<ModelName, ModelStats> = {
   openai: { requests: 0, tokens: 0, cost: 0, totalLatencyMs: 0 },
   gemini: { requests: 0, tokens: 0, cost: 0, totalLatencyMs: 0 },
   claude: { requests: 0, tokens: 0, cost: 0, totalLatencyMs: 0 },
+  "claude-opus": { requests: 0, tokens: 0, cost: 0, totalLatencyMs: 0 },
 };
 
 let totalRequests = 0;
@@ -82,6 +83,7 @@ export function getStats() {
       openai: buildModel("openai"),
       gemini: buildModel("gemini"),
       claude: buildModel("claude"),
+      "claude-opus": buildModel("claude-opus"),
     },
   };
 }

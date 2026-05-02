@@ -21,7 +21,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const ChatBody = zod.object({
   prompt: zod.string(),
-  model: zod.enum(["openai", "gemini", "claude"]),
+  model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
 });
 
@@ -60,6 +60,13 @@ export const GetStatsResponse = zod.object({
       avgLatencyMs: zod.number(),
     }),
     claude: zod.object({
+      requests: zod.number(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      totalLatencyMs: zod.number(),
+      avgLatencyMs: zod.number(),
+    }),
+    "claude-opus": zod.object({
       requests: zod.number(),
       tokens: zod.number(),
       cost: zod.number(),

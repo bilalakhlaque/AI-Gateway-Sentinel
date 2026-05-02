@@ -1,17 +1,19 @@
 import { logger } from "./logger";
 
-export type ModelName = "openai" | "gemini" | "claude";
+export type ModelName = "openai" | "gemini" | "claude" | "claude-opus";
 
 export const FALLBACK_NEXT: Record<ModelName, ModelName | null> = {
   openai: "gemini",
   gemini: "claude",
-  claude: null,
+  claude: "claude-opus",
+  "claude-opus": null,
 };
 
 const COST_PER_TOKEN: Record<ModelName, number> = {
   openai: 0.000015,
   gemini: 0.000007,
   claude: 0.000018,
+  "claude-opus": 0.000075,
 };
 
 export interface LLMResult {
@@ -118,10 +120,44 @@ async function callClaude(prompt: string): Promise<{ text: string; tokens: numbe
   return { text, tokens };
 }
 
+async function callClaudeOpus(prompt: string): Promise<{ text: string; tokens: number }> {
+  const apiKey = process.env["ANTHROPIC_API_KEY"];
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-7",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Claude Opus ${res.status}: ${err}`);
+  }
+
+  const data = (await res.json()) as {
+    content: Array<{ text: string }>;
+    usage: { input_tokens: number; output_tokens: number };
+  };
+
+  const text = data.content?.[0]?.text ?? "";
+  const tokens = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0);
+  return { text, tokens };
+}
+
 const callers: Record<ModelName, (prompt: string) => Promise<{ text: string; tokens: number }>> = {
   openai: callOpenAI,
   gemini: callGemini,
   claude: callClaude,
+  "claude-opus": callClaudeOpus,
 };
 
 /**

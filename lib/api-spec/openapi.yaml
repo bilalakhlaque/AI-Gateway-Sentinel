@@ -106,7 +106,7 @@ components:
           type: string
         model:
           type: string
-          enum: [openai, gemini, claude]
+          enum: [openai, gemini, claude, claude-opus]
         apiKey:
           type: ["string", "null"]
       required:
@@ -181,10 +181,13 @@ components:
               $ref: "#/components/schemas/ModelStats"
             claude:
               $ref: "#/components/schemas/ModelStats"
+            claude-opus:
+              $ref: "#/components/schemas/ModelStats"
           required:
             - openai
             - gemini
             - claude
+            - claude-opus
       required:
         - totalRequests
         - blockedRequests

@@ -9,7 +9,7 @@ import { z as zod } from "zod";
 
 export const ChatBody = zod.object({
   prompt: zod.string(),
-  model: zod.enum(["openai", "gemini", "claude"]),
+  model: zod.enum(["openai", "gemini", "claude", "claude-opus"]),
   apiKey: zod.string().nullish(),
 });
 

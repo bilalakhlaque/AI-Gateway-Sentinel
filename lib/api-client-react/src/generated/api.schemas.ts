@@ -16,6 +16,7 @@ export const ChatRequestModel = {
   openai: "openai",
   gemini: "gemini",
   claude: "claude",
+  "claude-opus": "claude-opus",
 } as const;
 
 export interface ChatRequest {
@@ -60,6 +61,7 @@ export type StatsResponseModels = {
   openai: ModelStats;
   gemini: ModelStats;
   claude: ModelStats;
+  "claude-opus": ModelStats;
 };
 
 export interface StatsResponse {

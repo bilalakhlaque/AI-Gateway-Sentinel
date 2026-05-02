@@ -20,11 +20,12 @@ import { format } from "date-fns";
 
 const MODEL_OPTIONS = [
   { value: "openai", label: "OpenAI GPT-5.4" },
-  { value: "gemini", label: "Gemini 3.1 Pro" },
-  { value: "claude", label: "Claude Sonnet 4.6" }
+  { value: "gemini", label: "Gemini 2.5 Flash" },
+  { value: "claude", label: "Claude Sonnet 4.6" },
+  { value: "claude-opus", label: "Claude Opus 4.7" },
 ];
 
-type ModelKey = "openai" | "gemini" | "claude";
+type ModelKey = "openai" | "gemini" | "claude" | "claude-opus";
 
 interface PendingFallback {
   suggestedModel: ModelKey;
@@ -34,8 +35,9 @@ interface PendingFallback {
 
 const MODEL_LABELS: Record<ModelKey, string> = {
   openai: "OpenAI GPT-5.4",
-  gemini: "Gemini 3.1 Pro",
+  gemini: "Gemini 2.5 Flash",
   claude: "Claude Sonnet 4.6",
+  "claude-opus": "Claude Opus 4.7",
 };
 
 export default function Home() {
@@ -98,7 +100,8 @@ export default function Home() {
   const chartData = stats ? [
     { name: 'OpenAI', cost: stats.models.openai.cost, fill: 'hsl(var(--chart-1))' },
     { name: 'Gemini', cost: stats.models.gemini.cost, fill: 'hsl(var(--chart-2))' },
-    { name: 'Claude', cost: stats.models.claude.cost, fill: 'hsl(var(--chart-3))' },
+    { name: 'Sonnet', cost: stats.models.claude.cost, fill: 'hsl(var(--chart-3))' },
+    { name: 'Opus', cost: (stats.models as any)['claude-opus'].cost, fill: 'hsl(var(--chart-4))' },
   ] : [];
 
   const logs = logsData?.logs || [];
@@ -340,33 +343,34 @@ export default function Home() {
             </div>
 
             {/* Model Breakdown */}
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {(["openai", "gemini", "claude"] as const).map(m => {
-                const modelStats = stats?.models?.[m] || { requests: 0, avgLatencyMs: 0, cost: 0, tokens: 0 };
+            <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {(["openai", "gemini", "claude", "claude-opus"] as const).map(m => {
+                const ms = (stats?.models as any)?.[m] || { requests: 0, avgLatencyMs: 0, cost: 0, tokens: 0 };
+                const label = MODEL_LABELS[m];
                 return (
                   <Card key={m} className="bg-slate-900/50 border-slate-800 shadow-lg">
-                    <CardHeader className="p-4 pb-2 border-b border-slate-800/50">
-                      <CardTitle className="text-sm font-mono capitalize text-slate-200 flex items-center justify-between">
-                        {m}
-                        <div className="w-2 h-2 rounded-full bg-cyan-500/50" />
+                    <CardHeader className="p-3 pb-2 border-b border-slate-800/50">
+                      <CardTitle className="text-xs font-mono text-slate-200 flex items-center justify-between gap-1">
+                        <span className="truncate">{label}</span>
+                        <div className="w-2 h-2 rounded-full bg-cyan-500/50 shrink-0" />
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 flex flex-col gap-3">
+                    <CardContent className="p-3 flex flex-col gap-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono text-slate-500">Requests</span>
-                        <span className="text-sm font-mono text-white">{modelStats.requests}</span>
+                        <span className="text-[10px] font-mono text-slate-500">Requests</span>
+                        <span className="text-xs font-mono text-white">{ms.requests}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono text-slate-500">Avg Latency</span>
-                        <span className="text-sm font-mono text-white">{modelStats.avgLatencyMs.toFixed(0)}ms</span>
+                        <span className="text-[10px] font-mono text-slate-500">Latency</span>
+                        <span className="text-xs font-mono text-white">{ms.avgLatencyMs.toFixed(0)}ms</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono text-slate-500">Tokens</span>
-                        <span className="text-sm font-mono text-white">{modelStats.tokens.toLocaleString()}</span>
+                        <span className="text-[10px] font-mono text-slate-500">Tokens</span>
+                        <span className="text-xs font-mono text-white">{ms.tokens.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-800/50 mt-1">
-                        <span className="text-xs font-mono text-slate-500 flex items-center gap-1"><Coins className="w-3 h-3" /> Cost</span>
-                        <span className="text-sm font-mono text-emerald-400">${modelStats.cost.toFixed(6)}</span>
+                      <div className="flex justify-between items-center pt-1.5 border-t border-slate-800/50 mt-0.5">
+                        <span className="text-[10px] font-mono text-slate-500 flex items-center gap-1"><Coins className="w-2.5 h-2.5" /> Cost</span>
+                        <span className="text-xs font-mono text-emerald-400">${ms.cost.toFixed(6)}</span>
                       </div>
                     </CardContent>
                   </Card>

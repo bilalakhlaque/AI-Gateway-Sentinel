@@ -32,6 +32,13 @@ export const StatsResponse = zod.object({
       totalLatencyMs: zod.number(),
       avgLatencyMs: zod.number(),
     }),
+    "claude-opus": zod.object({
+      requests: zod.number(),
+      tokens: zod.number(),
+      cost: zod.number(),
+      totalLatencyMs: zod.number(),
+      avgLatencyMs: zod.number(),
+    }),
   }),
 });
 
