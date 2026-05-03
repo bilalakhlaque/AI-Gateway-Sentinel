@@ -55,3 +55,11 @@ export function authenticateUser(username: string, password: string): User | nul
 export function getUserById(userId: string): User | null {
   return users.get(userId) ?? null;
 }
+
+export function getAllUsers(): Array<{ userId: string; username: string; createdAt: string }> {
+  return [...users.values()].map(({ userId, username, createdAt }) => ({
+    userId,
+    username,
+    createdAt,
+  }));
+}

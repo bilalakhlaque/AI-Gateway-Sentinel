@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AuthPage from "@/pages/AuthPage";
+import AdminPage from "@/pages/AdminPage";
 import { useAuth } from "@/hooks/useAuth";
 
 const queryClient = new QueryClient({
@@ -35,6 +36,7 @@ function AppRoutes() {
   return (
     <Switch>
       <Route path="/" component={() => <Home user={user} onLogout={logout} />} />
+      <Route path="/admin" component={() => <AdminPage user={user} onLogout={logout} />} />
       <Route component={NotFound} />
     </Switch>
   );

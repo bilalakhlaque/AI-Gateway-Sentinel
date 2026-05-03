@@ -11,7 +11,7 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 let _token: string | null = null;
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return _token;
 }
 

@@ -5,6 +5,7 @@ import authRouter from "./auth";
 import chatRouter from "./chat";
 import statsRouter from "./stats";
 import compareRouter from "./compare";
+import adminRouter from "./admin";
 import { requireAuth } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
@@ -18,5 +19,6 @@ router.use(requireAuth);
 router.use(chatRouter);
 router.use(compareRouter);
 router.use(statsRouter);
+router.use(adminRouter);
 
 export default router;

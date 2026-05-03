@@ -20,7 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff, LogOut, FlaskConical } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff, LogOut, FlaskConical, LayoutDashboard } from "lucide-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
@@ -456,6 +457,16 @@ export default function Home({ user, onLogout }: HomeProps) {
             <Users className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
             <span className="max-w-[100px] truncate text-cyan-300">{user.username}</span>
           </div>
+          <Link href="/admin">
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Admin Dashboard"
+              className="h-8 w-8 p-0 hover:bg-slate-800 hover:text-amber-400 text-slate-500 transition-colors"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             size="sm"
