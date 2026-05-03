@@ -1,6 +1,6 @@
 export type ModelName = "openai" | "gemini" | "claude" | "claude-opus";
 
-export type RequestStatus = "success" | "fallback" | "blocked" | "error";
+export type RequestStatus = "success" | "fallback" | "blocked" | "error" | "cached";
 
 interface ModelStats {
   requests: number;

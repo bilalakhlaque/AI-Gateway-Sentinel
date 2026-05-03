@@ -3,6 +3,7 @@ import { callModel, FALLBACK_NEXT, type ModelName, type ModelKeys } from "../lib
 import { recordRequest, getModelCost } from "../lib/statsStore";
 import { detectPii } from "../lib/piiDetector";
 import { detectPromptInjection } from "../lib/promptInjectionDetector";
+import { checkCache, addToCache } from "../lib/semanticCache";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -54,32 +55,59 @@ router.post("/compare", async (req, res): Promise<void> => {
     return;
   }
 
+  type ModelResult =
+    | { fromCache: true; response: string; tokens: number; cost: number; latencyMs: number; similarity: number; originalPrompt: string; modelUsed: ModelName }
+    | { fromCache: false; response: string; tokens: number; cost: number; latencyMs: number; modelUsed: ModelName };
+
   const settled = await Promise.allSettled(
-    ALL_MODELS.map((model) => {
+    ALL_MODELS.map(async (model): Promise<ModelResult> => {
       const modelBudget = budgets?.[model as keyof typeof budgets];
       if (modelBudget !== undefined && getModelCost(tenantId, model) >= modelBudget) {
-        return Promise.reject(
-          new Error(`Budget limit of $${modelBudget.toFixed(4)} reached for ${model}`)
-        );
+        throw new Error(`Budget limit of $${modelBudget.toFixed(4)} reached for ${model}`);
       }
-      return callModel(model, prompt, modelKeys as ModelKeys);
+
+      const hit = checkCache(prompt, model);
+      if (hit) {
+        recordRequest(tenantId, {
+          model, modelUsed: model, tokens: 0, cost: 0, latencyMs: 0,
+          status: "cached", promptSnippet: prompt.slice(0, 80), responseText: hit.response,
+        });
+        return { fromCache: true, response: hit.response, tokens: hit.tokens, cost: hit.cost, latencyMs: hit.latencyMs, similarity: hit.similarity, originalPrompt: hit.originalPrompt, modelUsed: model };
+      }
+
+      const r = await callModel(model, prompt, modelKeys as ModelKeys);
+      addToCache(prompt, model, r.response, r.tokens, r.cost, r.latencyMs);
+      return { fromCache: false, response: r.response, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs, modelUsed: r.modelUsed };
     }),
   );
 
   const results: Record<string, object> = {};
   for (let i = 0; i < ALL_MODELS.length; i++) {
-    const model = ALL_MODELS[i];
-    const outcome = settled[i];
+    const model = ALL_MODELS[i]!;
+    const outcome = settled[i]!;
     if (outcome.status === "fulfilled") {
       const r = outcome.value;
-      results[model] = { response: r.response, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs, status: "success", error: null };
-      recordRequest(tenantId, {
-        model, modelUsed: r.modelUsed, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs,
-        status: "success", promptSnippet: prompt.slice(0, 80), responseText: r.response,
-      });
+      results[model] = {
+        response: r.response,
+        tokens: r.tokens,
+        cost: r.cost,
+        latencyMs: r.latencyMs,
+        status: r.fromCache ? "cached" : "success",
+        error: null,
+        cached: r.fromCache,
+        cacheHit: r.fromCache
+          ? { similarity: r.similarity, originalPrompt: r.originalPrompt }
+          : null,
+      };
+      if (!r.fromCache) {
+        recordRequest(tenantId, {
+          model, modelUsed: r.modelUsed, tokens: r.tokens, cost: r.cost, latencyMs: r.latencyMs,
+          status: "success", promptSnippet: prompt.slice(0, 80), responseText: r.response,
+        });
+      }
     } else {
       const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-      results[model] = { response: null, tokens: 0, cost: 0, latencyMs: 0, status: "error", error: msg };
+      results[model] = { response: null, tokens: 0, cost: 0, latencyMs: 0, status: "error", error: msg, cached: false, cacheHit: null };
       recordRequest(tenantId, {
         model, modelUsed: model, tokens: 0, cost: 0, latencyMs: 0,
         status: "error", promptSnippet: prompt.slice(0, 80), errorMessage: msg,

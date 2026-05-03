@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bar, BarChart, Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff, LogOut } from "lucide-react";
+import { Loader2, Shield, Activity, AlertCircle, Zap, Clock, Coins, Database, ArrowRight, X, ChevronDown, ChevronUp, Maximize2, Minimize2, Settings, ShieldAlert, Layers, SplitSquareHorizontal, Download, TrendingUp, Users, ChevronRight, AlertTriangle, Sun, Moon, Wifi, WifiOff, LogOut, FlaskConical } from "lucide-react";
 import { format } from "date-fns";
 import SettingsModal from "@/components/SettingsModal";
 import { useApiKeys } from "@/hooks/useApiKeys";
@@ -727,16 +727,24 @@ export default function Home({ user, onLogout }: HomeProps) {
                   <Database className="w-4 h-4 text-cyan-400" />
                   Response Log
                 </div>
-                {lastResponse && (
-                  <Badge variant={lastResponse.status === 'success' ? 'default' : lastResponse.status === 'fallback' ? 'secondary' : 'destructive'} 
-                    className={`
-                      ${lastResponse.status === 'success' ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30' : ''}
-                      ${lastResponse.status === 'fallback' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/20 border-amber-500/30' : ''}
-                      ${lastResponse.status === 'blocked' ? 'bg-rose-500/20 text-rose-400 hover:bg-rose-500/20 border-rose-500/30' : ''}
-                    `}>
-                    {lastResponse.status.toUpperCase()}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {lastResponse?.cached && (
+                    <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/20 gap-1 font-mono text-[10px]">
+                      <FlaskConical className="w-3 h-3" />
+                      CACHED {Math.round((lastResponse.cacheHit?.similarity ?? 0) * 100)}%
+                    </Badge>
+                  )}
+                  {lastResponse && (
+                    <Badge variant={lastResponse.status === 'success' || lastResponse.status === 'cached' ? 'default' : lastResponse.status === 'fallback' ? 'secondary' : 'destructive'}
+                      className={`
+                        ${lastResponse.status === 'success' || lastResponse.status === 'cached' ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/30' : ''}
+                        ${lastResponse.status === 'fallback' ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/20 border-amber-500/30' : ''}
+                        ${lastResponse.status === 'blocked' ? 'bg-rose-500/20 text-rose-400 hover:bg-rose-500/20 border-rose-500/30' : ''}
+                      `}>
+                      {lastResponse.status.toUpperCase()}
+                    </Badge>
+                  )}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-1">
@@ -746,6 +754,17 @@ export default function Home({ user, onLogout }: HomeProps) {
                 </div>
               ) : (
                 <div className="p-4 flex flex-col gap-4 h-full">
+                  {lastResponse.cached && lastResponse.cacheHit && (
+                    <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 flex items-center gap-2.5">
+                      <FlaskConical className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[10px] font-mono text-cyan-400 font-semibold tracking-wide">SEMANTIC CACHE HIT — {Math.round(lastResponse.cacheHit.similarity * 100)}% similarity · $0 cost · instant response</span>
+                        <span className="text-[10px] font-mono text-slate-500 truncate">
+                          Matched: &ldquo;{lastResponse.cacheHit.originalPrompt.slice(0, 80)}{lastResponse.cacheHit.originalPrompt.length > 80 ? "…" : ""}&rdquo;
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div className="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-slate-500">REQUESTED</span>
@@ -757,11 +776,11 @@ export default function Home({ user, onLogout }: HomeProps) {
                     </div>
                     <div className="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-slate-500">LATENCY</span>
-                      <span className="text-xs font-mono text-white">{lastResponse.latencyMs}ms</span>
+                      <span className="text-xs font-mono text-white">{lastResponse.cached ? <span className="text-cyan-400">0ms ⚡</span> : `${lastResponse.latencyMs}ms`}</span>
                     </div>
                     <div className="bg-slate-950 border border-slate-800 rounded p-2 flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-slate-500">COST</span>
-                      <span className="text-xs font-mono text-emerald-400">${lastResponse.cost.toFixed(6)}</span>
+                      <span className="text-xs font-mono text-emerald-400">{lastResponse.cached ? "$0.000000 ⚡" : `$${lastResponse.cost.toFixed(6)}`}</span>
                     </div>
                   </div>
                   
@@ -816,29 +835,38 @@ export default function Home({ user, onLogout }: HomeProps) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {compareResults.map((r: any) => {
                       const label = MODEL_LABELS[r.model as ModelKey] ?? r.model;
-                      const isOk = r.status === "success";
+                      const isOk = r.status === "success" || r.status === "cached";
+                      const isCached = r.status === "cached";
                       return (
-                        <div key={r.model} className={`rounded-lg border p-3 flex flex-col gap-2 ${isOk ? "border-slate-700 bg-slate-950/60" : "border-rose-900/40 bg-rose-950/10"}`}>
+                        <div key={r.model} className={`rounded-lg border p-3 flex flex-col gap-2 ${isOk ? (isCached ? "border-cyan-700/40 bg-cyan-950/10" : "border-slate-700 bg-slate-950/60") : "border-rose-900/40 bg-rose-950/10"}`}>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-mono font-semibold text-slate-200 truncate">{label}</span>
-                            <Badge className={`text-[10px] shrink-0 ${isOk ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border-rose-500/30"}`}>
-                              {isOk ? "OK" : "FAILED"}
-                            </Badge>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isCached && (
+                                <Badge className="text-[9px] bg-cyan-500/20 text-cyan-300 border-cyan-500/30 gap-1 font-mono py-0">
+                                  <FlaskConical className="w-2.5 h-2.5" />
+                                  {Math.round((r.cacheHit?.similarity ?? 0) * 100)}%
+                                </Badge>
+                              )}
+                              <Badge className={`text-[10px] ${isOk ? (isCached ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30") : "bg-rose-500/20 text-rose-400 border-rose-500/30"}`}>
+                                {isCached ? "CACHED" : isOk ? "OK" : "FAILED"}
+                              </Badge>
+                            </div>
                           </div>
                           {isOk ? (
                             <>
                               <div className="grid grid-cols-3 gap-1">
                                 <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
                                   <span className="text-[9px] font-mono text-slate-500">LATENCY</span>
-                                  <span className="text-[11px] font-mono text-white">{r.latencyMs}ms</span>
+                                  <span className="text-[11px] font-mono text-white">{isCached ? <span className="text-cyan-400">0ms ⚡</span> : `${r.latencyMs}ms`}</span>
                                 </div>
                                 <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
                                   <span className="text-[9px] font-mono text-slate-500">TOKENS</span>
-                                  <span className="text-[11px] font-mono text-white">{r.tokens ?? "—"}</span>
+                                  <span className="text-[11px] font-mono text-white">{isCached ? <span className="text-cyan-400">0 ⚡</span> : (r.tokens ?? "—")}</span>
                                 </div>
                                 <div className="bg-slate-900 rounded p-1.5 flex flex-col gap-0.5">
                                   <span className="text-[9px] font-mono text-slate-500">COST</span>
-                                  <span className="text-[11px] font-mono text-emerald-400">${r.cost?.toFixed(5) ?? "—"}</span>
+                                  <span className="text-[11px] font-mono text-emerald-400">{isCached ? "$0 ⚡" : `$${r.cost?.toFixed(5) ?? "—"}`}</span>
                                 </div>
                               </div>
                               <ScrollArea className="h-[120px]">

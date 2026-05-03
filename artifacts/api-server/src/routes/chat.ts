@@ -4,6 +4,7 @@ import { callModel, FALLBACK_NEXT, type ModelName, type ModelKeys } from "../lib
 import { recordRequest, getModelCost } from "../lib/statsStore";
 import { detectPii } from "../lib/piiDetector";
 import { detectPromptInjection } from "../lib/promptInjectionDetector";
+import { checkCache, addToCache } from "../lib/semanticCache";
 import { ChatBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -78,8 +79,39 @@ router.post("/chat", async (req, res): Promise<void> => {
     return;
   }
 
+  // Semantic cache check
+  const hit = checkCache(prompt, model);
+  if (hit) {
+    recordRequest(tenantId, {
+      model: model as ModelName,
+      modelUsed: model as ModelName,
+      tokens: 0,
+      cost: 0,
+      latencyMs: 0,
+      status: "cached",
+      promptSnippet: prompt.slice(0, 80),
+      responseText: hit.response,
+    });
+    res.json({
+      response: hit.response,
+      model,
+      modelUsed: model,
+      fallback: false,
+      tokens: 0,
+      cost: 0,
+      latencyMs: 0,
+      status: "cached",
+      errorMessage: null,
+      cached: true,
+      cacheHit: { similarity: hit.similarity, originalPrompt: hit.originalPrompt },
+    });
+    return;
+  }
+
   try {
     const result = await callModel(model as ModelName, prompt, modelKeys);
+
+    addToCache(prompt, model, result.response, result.tokens, result.cost, result.latencyMs);
 
     recordRequest(tenantId, {
       model: model as ModelName,
@@ -102,6 +134,8 @@ router.post("/chat", async (req, res): Promise<void> => {
       latencyMs: result.latencyMs,
       status: "success",
       errorMessage: null,
+      cached: false,
+      cacheHit: null,
     });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
