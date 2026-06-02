@@ -252,7 +252,7 @@ pnpm dev
 
 ## Author
 
-Bilal Akhlaque
+Bilal Akhlaque, Arhum Khan
 
 - GitHub: https://github.com/bilalakhlaque
 - LinkedIn: https://linkedin.com/in/bilalaakhlaque
