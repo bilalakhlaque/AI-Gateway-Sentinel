@@ -108,7 +108,7 @@ Key takeaways included:
 
 ## Demo Video
 
-[![Watch Demo](assets/sentin-demo-thumbnail.png)](https://youtu.be/mAeBLBr5VG4)
+[![Watch Demo](assets/mq2.jpg)](https://youtu.be/mAeBLBr5VG4)
 
 ---
 
