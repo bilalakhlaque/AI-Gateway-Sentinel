@@ -1,26 +1,67 @@
-# SentinAI Gateway – AI Infrastructure & Dashboard
+# SentinAI Gateway – Multi-Provider AI Gateway & Analytics Platform
 
-SentinAI Gateway is a full-stack AI management platform designed to centralize interactions with multiple Large Language Model (LLM) providers through a unified interface. Built during a fast-paced buildathon, the project combines modern frontend development, backend API design, and AI integration to provide a centralized dashboard for managing and monitoring AI services.
+SentinAI Gateway is a full-stack AI infrastructure platform that provides a centralized interface for interacting with multiple Large Language Model (LLM) providers. The platform combines a modern React dashboard, an Express-based API gateway, authentication, analytics, caching, cost tracking, and model comparison tools into a unified system.
+
+Built using a TypeScript-first architecture, the project demonstrates modern software engineering practices including contract-first API development, code generation, shared schemas, and monorepo organization.
 
 ---
 
 ## Overview
 
-As the AI ecosystem continues to expand, organizations often interact with multiple model providers for different tasks. SentinAI Gateway was developed to explore how a centralized gateway could simplify model access, routing, monitoring, and management through a single platform.
+Modern AI applications often rely on multiple providers for performance, cost optimization, and model specialization.
 
-The system combines a React-based frontend dashboard with a Node.js backend capable of communicating with multiple AI providers, enabling users to manage AI interactions through a unified experience.
+SentinAI Gateway acts as a centralized orchestration layer that allows users to:
+
+- Route requests to multiple AI providers
+- Compare model outputs side-by-side
+- Monitor usage and health metrics
+- Track estimated costs
+- Manage authentication and tenants
+- Apply security and validation controls
+- Analyze system performance through dashboards
+
+The platform was designed around a contract-first development workflow using OpenAPI specifications and generated client libraries, ensuring consistency across frontend and backend services.
 
 ---
 
 ## Key Features
 
-- Unified AI gateway architecture
-- Multi-provider LLM integration
-- Responsive dashboard interface
-- API usage monitoring and visualization
-- State-driven frontend design
-- REST API communication layer
-- Modular full-stack architecture
+### Multi-Provider AI Gateway
+
+- OpenAI integration
+- Google Gemini integration
+- Anthropic Claude integration
+- Claude Opus integration
+- Unified request handling layer
+
+### Model Comparison
+
+- Execute parallel requests across multiple models
+- Compare responses side-by-side
+- Evaluate output quality and behavior
+
+### Authentication & Authorization
+
+- User registration and login
+- JWT authentication
+- Protected API routes
+- Admin functionality
+
+### Analytics Dashboard
+
+- Usage monitoring
+- Request logging
+- Health metrics
+- Tenant statistics
+- Cost analysis and projections
+
+### Intelligent Request Processing
+
+- Semantic caching
+- Provider fallback logic
+- Rate limiting
+- Prompt injection detection
+- PII detection and filtering
 
 ---
 
@@ -35,27 +76,75 @@ The system combines a React-based frontend dashboard with a Node.js backend capa
 
 ### Frontend
 
-- React.js
+- React
 - Vite
+- Tailwind CSS
+- Radix UI
+- React Query
+- Recharts
+- Wouter
 
 ### Backend
 
 - Node.js
-- Express.js
+- Express 5
+- Pino Logging
+- Jose JWT
 
-### AI & APIs
+### AI Providers
 
-- OpenAI API
-- Anthropic API
-- Google AI APIs
+- OpenAI
+- Gemini
+- Anthropic Claude
+- Claude Opus
 
-### Concepts
+### API & Contract Generation
 
-- Full-Stack Development
-- API Integration
-- AI Infrastructure
-- State Management
-- RESTful Services
+- OpenAPI
+- Orval
+- Zod
+
+### Database & Storage
+
+- PostgreSQL
+- Drizzle ORM
+
+### Monorepo Tooling
+
+- pnpm Workspaces
+
+---
+
+## Monorepo Structure
+
+```text
+AI-Gateway-Sentinel
+│
+├── artifacts/
+│   ├── sentinai
+│   │   └── React dashboard
+│   │
+│   ├── api-server
+│   │   └── Express backend gateway
+│   │
+│   └── mockup-sandbox
+│       └── UI prototypes
+│
+├── lib/
+│   ├── api-spec
+│   │   └── OpenAPI specifications
+│   │
+│   ├── api-client-react
+│   │   └── Generated React Query clients
+│   │
+│   ├── api-zod
+│   │   └── Shared validation schemas
+│   │
+│   └── db
+│       └── PostgreSQL / Drizzle package
+│
+└── pnpm-workspace.yaml
+```
 
 ---
 
@@ -68,41 +157,55 @@ User
 React Dashboard
  │
  ▼
-Express API Layer
+Express API Gateway
  │
  ├── OpenAI
- ├── Anthropic
- └── Google AI
+ ├── Gemini
+ ├── Claude
+ └── Claude Opus
+ │
+ ▼
+Analytics + Cache + Security Layer
+ │
+ ├── Rate Limiting
+ ├── Semantic Cache
+ ├── PII Detection
+ ├── Prompt Injection Detection
+ └── Cost Tracking
 ```
-
-The frontend dashboard communicates with a centralized API layer which manages requests to multiple AI providers. This architecture creates a single entry point for AI interactions while maintaining flexibility for future integrations.
 
 ---
 
-## Engineering Contributions
+## Engineering Highlights
 
-- Co-developed a full-stack AI gateway and management dashboard during a compressed buildathon timeline
-- Integrated multiple LLM providers through a unified backend architecture
-- Designed responsive frontend interfaces using React component architecture
-- Implemented REST-based communication between frontend and backend services
-- Utilized modern AI development workflows to rapidly learn unfamiliar technologies and deliver functional software under strict time constraints
+- Designed and implemented a monorepo architecture using pnpm workspaces
+- Built a contract-first API workflow using OpenAPI, Orval, and Zod code generation
+- Integrated multiple LLM providers behind a unified gateway layer
+- Developed model comparison capabilities for side-by-side evaluation
+- Implemented semantic caching to reduce duplicate provider requests
+- Added provider fallback mechanisms to improve resiliency
+- Built analytics dashboards for monitoring usage, health, and cost metrics
+- Implemented JWT authentication and authorization workflows
+- Developed reusable shared schemas and generated API clients to maintain type safety across services
 
 ---
 
 ## Challenges & Lessons Learned
 
-One of the biggest challenges was working within a highly compressed development timeline while simultaneously learning and applying new technologies.
+One of the most valuable lessons from this project was learning how to maintain consistency across a rapidly evolving full-stack codebase.
 
-The project required quickly understanding modern frontend frameworks, API integration patterns, and AI development workflows while maintaining progress toward a working product.
+By adopting a contract-first architecture with OpenAPI specifications, generated React Query clients, and shared Zod schemas, frontend and backend services remained synchronized while reducing manual maintenance overhead.
 
-Key takeaways included:
+The project also provided hands-on experience with:
 
-- Rapid prototyping techniques
-- Modern React development workflows
-- API-driven architecture
-- Multi-service integration
-- Team collaboration under tight deadlines
-- Practical AI application development
+- Monorepo architecture
+- Full-stack TypeScript development
+- API design
+- AI infrastructure
+- Authentication systems
+- Performance optimization
+- Security controls
+- Software scalability patterns
 
 ---
 
@@ -114,13 +217,13 @@ Key takeaways included:
 
 ## Future Improvements
 
-- Authentication and user management
-- Provider failover and fallback routing
-- Request caching and optimization
-- Analytics and reporting dashboards
-- Cost tracking across providers
-- Additional model integrations
-- Deployment and scaling infrastructure
+- Persistent database-backed analytics
+- Distributed caching layer
+- Containerized deployment infrastructure
+- Kubernetes orchestration
+- Multi-region provider routing
+- Team collaboration features
+- Advanced prompt evaluation tooling
 
 ---
 
@@ -136,20 +239,20 @@ cd AI-Gateway-Sentinel
 ### Install Dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
-### Run Development Server
+### Start Development Environment
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ---
 
 ## Author
 
-Bilal Akhlaque, Arhum Khan
+Bilal Akhlaque
 
 - GitHub: https://github.com/bilalakhlaque
 - LinkedIn: https://linkedin.com/in/bilalaakhlaque
